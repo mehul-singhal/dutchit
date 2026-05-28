@@ -13,6 +13,7 @@ import { GroupBalances } from '@/components/groups/group-balances'
 import { GroupMembers } from '@/components/groups/group-members'
 import { GroupActivity } from '@/components/groups/group-activity'
 import { GroupSettingsDialog } from '@/components/groups/group-settings-dialog'
+import { GroupExportButton } from '@/components/groups/group-export-button'
 import type { Group, MemberRole } from '@/types/database'
 
 interface Props {
@@ -61,6 +62,7 @@ export function GroupDetail({ group: initialGroup, userId, userRole }: Props) {
           )}
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          <GroupExportButton groupId={group.id} groupName={group.name} />
           <Button
             variant="outline"
             size="sm"
