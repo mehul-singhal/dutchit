@@ -3,6 +3,7 @@ import { DM_Sans } from 'next/font/google'
 import './globals.css'
 import { Toaster } from '@/components/ui/sonner'
 import { Providers } from '@/components/providers'
+import { ServiceWorkerRegistrar } from '@/components/service-worker-registrar'
 
 const dmSans = DM_Sans({
   variable: '--font-dm-sans',
@@ -21,9 +22,17 @@ export const metadata: Metadata = {
   authors: [{ name: 'DutchIt' }],
   manifest: '/manifest.json',
   appleWebApp: {
-    capable: true,
-    statusBarStyle: 'black-translucent',
-    title: 'DutchIt',
+      capable: true,
+      statusBarStyle: 'black-translucent',
+      title: 'DutchIt',
+      startupImage: '/apple-touch-icon.png',
+    },
+  icons: {
+    apple: '/apple-touch-icon.png',
+    icon: [
+      { url: '/icon-192.png', sizes: '192x192', type: 'image/png' },
+      { url: '/icon-512.png', sizes: '512x512', type: 'image/png' },
+    ],
   },
   openGraph: {
     title: 'DutchIt — Split smart. Settle faster.',
@@ -48,6 +57,7 @@ export default function RootLayout({
     <html lang="en" className={`${dmSans.variable} h-full antialiased dark`}>
       <body className="min-h-full flex flex-col">
         <Providers>{children}</Providers>
+        <ServiceWorkerRegistrar />
         <Toaster
           position="top-right"
           theme="dark"
