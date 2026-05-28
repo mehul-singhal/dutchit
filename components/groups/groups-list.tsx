@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input'
 import { GroupCard } from '@/components/groups/group-card'
 import { CreateGroupDialog } from '@/components/groups/create-group-dialog'
 import { JoinGroupDialog } from '@/components/groups/join-group-dialog'
+import { useFabAction } from '@/lib/utils/fab'
 import type { Group } from '@/types/database'
 
 interface Props {
@@ -34,6 +35,9 @@ export function GroupsList({ userId }: Props) {
       setJoinOpen(true)
     }
   }, [searchParams])
+
+  // FAB → open create group dialog
+  useFabAction(() => setCreateOpen(true))
 
   const { data: groups, isLoading } = useQuery({
     queryKey: ['groups', userId],

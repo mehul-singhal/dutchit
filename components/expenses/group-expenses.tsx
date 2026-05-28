@@ -12,6 +12,7 @@ import { createClient } from '@/lib/supabase/client'
 import { formatINR, formatDate, getInitials } from '@/lib/utils/formatters'
 import { AddExpenseSheet } from '@/components/expenses/add-expense-sheet'
 import { EXPENSE_CATEGORY_META } from '@/components/expenses/expense-category-meta'
+import { useFabAction } from '@/lib/utils/fab'
 import type { Expense, MemberRole, UserProfile, ExpenseCategory, SplitType } from '@/types/database'
 
 type ExpenseSplitWithUser = {
@@ -43,6 +44,9 @@ export function GroupExpenses({ groupId, userId, userRole }: Props) {
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const supabase = createClient()
   const queryClient = useQueryClient()
+
+  // FAB → open add expense dialog when inside a group
+  useFabAction(() => setAddOpen(true))
 
   const { data: expenses, isLoading } = useQuery({
     queryKey: ['expenses', groupId],
@@ -127,9 +131,22 @@ export function GroupExpenses({ groupId, userId, userRole }: Props) {
               const splits = expense.expense_splits ?? []
               const mySplit = splits.find((s) => s.user_id === userId)
 
+              // Show date separator when the date changes
+              const prevExpense = i > 0 ? expenses[i - 1] : null
+              const showDateSep = !prevExpense || prevExpense.date !== expense.date
+
               return (
-                <motion.div
-                  key={expense.id}
+                <div key={expense.id}>
+                  {showDateSep && (
+                    <div className="flex items-center gap-3 my-3 first:mt-0">
+                      <div className="h-px flex-1 bg-white/8" />
+                      <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider px-1">
+                        {formatDate(expense.date)}
+                      </span>
+                      <div className="h-px flex-1 bg-white/8" />
+                    </div>
+                  )}
+              <motion.div
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: Math.min(i * 0.04, 0.3) }}
@@ -145,13 +162,9 @@ export function GroupExpenses({ groupId, userId, userRole }: Props) {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-sm truncate">{expense.title}</p>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <span className="text-xs text-muted-foreground">{formatDate(expense.date)}</span>
-                        <span className="text-xs text-muted-foreground">·</span>
-                        <span className="text-xs text-muted-foreground">
-                          {paidBy?.id === userId ? 'You' : paidBy?.full_name ?? 'Unknown'} paid
-                        </span>
-                      </div>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {paidBy?.id === userId ? 'You' : paidBy?.full_name ?? 'Unknown'} paid
+                      </p>
                     </div>
                     <div className="text-right shrink-0">
                       <p className="font-semibold text-sm">{formatINR(expense.amount)}</p>
@@ -241,6 +254,7 @@ export function GroupExpenses({ groupId, userId, userRole }: Props) {
                     )}
                   </AnimatePresence>
                 </motion.div>
+                </div>
               )
             })}
           </div>
