@@ -44,3 +44,6 @@ next-env.d.ts
 .claude/
 CLAUDE.md
 AGENTS.md
+
+# Local research notes (not for git)
+OFFLINE_SYNC_NOTES.md
