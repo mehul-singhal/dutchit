@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
 import { format, startOfMonth, endOfMonth, subMonths } from 'date-fns'
-import { Plus, TrendingDown, Target, Loader2, Trash2 } from 'lucide-react'
+import { Plus, TrendingDown, TrendingUp, PiggyBank, Loader2, Trash2 } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -20,8 +20,11 @@ import { EXPENSE_CATEGORY_META } from '@/components/expenses/expense-category-me
 import { SpendingChart } from '@/components/finance/spending-chart'
 import { CategoryBreakdown } from '@/components/finance/category-breakdown'
 import { BudgetTracker } from '@/components/finance/budget-tracker'
+import { IncomeTracker } from '@/components/finance/income-tracker'
+import { SavingsTracker } from '@/components/finance/savings-tracker'
+import { FinanceOverview } from '@/components/finance/finance-overview'
 import { CountUp } from '@/components/animations/count-up'
-import type { ExpenseCategory } from '@/types/database'
+import type { ExpenseCategory, ExpenseFundingSource } from '@/types/database'
 import { cn } from '@/lib/utils'
 
 const expenseSchema = z.object({
@@ -30,6 +33,7 @@ const expenseSchema = z.object({
   category: z.enum(['food', 'travel', 'accommodation', 'entertainment', 'shopping', 'utilities', 'other'] as const),
   date: z.string(),
   notes: z.string().optional(),
+  paid_from: z.enum(['income', 'savings']).optional(),
 })
 
 type ExpenseForm = z.infer<typeof expenseSchema>
@@ -40,6 +44,7 @@ interface Props {
 
 export function PersonalDashboard({ userId }: Props) {
   const [addOpen, setAddOpen] = useState(false)
+  const [activeTab, setActiveTab] = useState('overview')
   const [selectedMonth, setSelectedMonth] = useState(new Date())
   const supabase = createClient()
   const queryClient = useQueryClient()
@@ -53,6 +58,7 @@ export function PersonalDashboard({ userId }: Props) {
   })
 
   const selectedCategory = watch('category')
+  const selectedPaidFrom = watch('paid_from')
 
   const monthStart = startOfMonth(selectedMonth).toISOString().split('T')[0]
   const monthEnd = endOfMonth(selectedMonth).toISOString().split('T')[0]
@@ -71,6 +77,31 @@ export function PersonalDashboard({ userId }: Props) {
     },
   })
 
+  // Monthly totals for stat cards (income + savings)
+  const { data: monthlyTotals } = useQuery({
+    queryKey: ['monthly-totals', userId, monthStart],
+    queryFn: async () => {
+      const [incomeRes, savingsRes] = await Promise.all([
+        supabase
+          .from('personal_income')
+          .select('amount')
+          .eq('user_id', userId)
+          .eq('month', selectedMonth.getMonth() + 1)
+          .eq('year', selectedMonth.getFullYear()),
+        supabase
+          .from('personal_savings')
+          .select('amount')
+          .eq('user_id', userId)
+          .gte('date', monthStart)
+          .lte('date', monthEnd),
+      ])
+      return {
+        totalIncome: (incomeRes.data ?? []).reduce((s, r) => s + r.amount, 0),
+        totalSavings: (savingsRes.data ?? []).reduce((s, r) => s + r.amount, 0),
+      }
+    },
+  })
+
   // Last 6 months for chart
   const { data: chartData } = useQuery({
     queryKey: ['personal-chart', userId],
@@ -80,14 +111,13 @@ export function PersonalDashboard({ userId }: Props) {
         months.map(async (month) => {
           const start = startOfMonth(month).toISOString().split('T')[0]
           const end = endOfMonth(month).toISOString().split('T')[0]
-          const { data } = await supabase
-            .from('personal_expenses')
-            .select('amount')
-            .eq('user_id', userId)
-            .gte('date', start)
-            .lte('date', end)
-          const total = (data ?? []).reduce((s, e) => s + e.amount, 0)
-          return { month: format(month, 'MMM'), total }
+          const [expRes, incRes] = await Promise.all([
+            supabase.from('personal_expenses').select('amount').eq('user_id', userId).gte('date', start).lte('date', end),
+            supabase.from('personal_income').select('amount').eq('user_id', userId).eq('month', month.getMonth() + 1).eq('year', month.getFullYear()),
+          ])
+          const total = (expRes.data ?? []).reduce((s, e) => s + e.amount, 0)
+          const income = (incRes.data ?? []).reduce((s, e) => s + e.amount, 0)
+          return { month: format(month, 'MMM'), total, income }
         })
       )
       return results
@@ -102,6 +132,7 @@ export function PersonalDashboard({ userId }: Props) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['personal-expenses'] })
       queryClient.invalidateQueries({ queryKey: ['personal-chart'] })
+      queryClient.invalidateQueries({ queryKey: ['finance-overview'] })
       toast.success('Expense deleted')
     },
   })
@@ -114,6 +145,7 @@ export function PersonalDashboard({ userId }: Props) {
       category: data.category,
       date: data.date,
       notes: data.notes || null,
+      paid_from: data.paid_from ?? null,
     })
 
     if (error) {
@@ -123,33 +155,51 @@ export function PersonalDashboard({ userId }: Props) {
 
     queryClient.invalidateQueries({ queryKey: ['personal-expenses'] })
     queryClient.invalidateQueries({ queryKey: ['personal-chart'] })
+    queryClient.invalidateQueries({ queryKey: ['finance-overview'] })
     toast.success('Expense added!')
     reset()
     setAddOpen(false)
   }
 
   const totalThisMonth = expenses?.reduce((s, e) => s + e.amount, 0) ?? 0
+  const totalIncome = monthlyTotals?.totalIncome ?? 0
+  const totalSavings = monthlyTotals?.totalSavings ?? 0
+  const freeCash = totalIncome - totalThisMonth - totalSavings
   const categories = Object.entries(EXPENSE_CATEGORY_META) as [ExpenseCategory, { label: string; emoji: string }][]
 
-  // Category breakdown for current month
   const categoryTotals = expenses?.reduce((acc, e) => {
     acc[e.category] = (acc[e.category] ?? 0) + e.amount
     return acc
   }, {} as Record<string, number>) ?? {}
+
+  const addButtonLabel =
+    activeTab === 'income' ? '+ Income' :
+    activeTab === 'savings' ? '+ Savings' :
+    '+ Expense'
+
+  function handleAddClick() {
+    if (activeTab === 'income' || activeTab === 'savings') {
+      // Handled inside child components via their own + buttons
+      // This button is only shown for expense-related tabs
+    }
+    setAddOpen(true)
+  }
 
   return (
     <div className="max-w-4xl mx-auto">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold">My Finance</h1>
-          <p className="text-muted-foreground text-sm mt-1">Track your personal spending</p>
+          <p className="text-muted-foreground text-sm mt-1">Track your income, expenses &amp; savings</p>
         </div>
-        <Button
-          className="gradient-teal text-[#0a0f1e] font-semibold gap-1"
-          onClick={() => setAddOpen(true)}
-        >
-          <Plus className="w-4 h-4" /> Add
-        </Button>
+        {activeTab !== 'income' && activeTab !== 'savings' && (
+          <Button
+            className="gradient-teal text-[#0a0f1e] font-semibold gap-1"
+            onClick={() => setAddOpen(true)}
+          >
+            <Plus className="w-4 h-4" /> Add
+          </Button>
+        )}
       </div>
 
       {/* Month selector */}
@@ -173,45 +223,65 @@ export function PersonalDashboard({ userId }: Props) {
         })}
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
+      {/* Stats — 4 cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="glass rounded-2xl p-4">
+          <div className="w-8 h-8 rounded-xl bg-emerald-400/15 flex items-center justify-center mb-2">
+            <TrendingUp className="w-4 h-4 text-emerald-400" />
+          </div>
+          <p className="text-xl font-bold text-emerald-400">₹<CountUp to={totalIncome} /></p>
+          <p className="text-xs text-muted-foreground mt-0.5">Income</p>
+        </motion.div>
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.04 }} className="glass rounded-2xl p-4">
           <div className="w-8 h-8 rounded-xl bg-rose-400/15 flex items-center justify-center mb-2">
             <TrendingDown className="w-4 h-4 text-rose-400" />
           </div>
-          <p className="text-xl font-bold">₹<CountUp to={totalThisMonth} /></p>
-          <p className="text-xs text-muted-foreground mt-0.5">Total spent</p>
+          <p className="text-xl font-bold text-rose-400">₹<CountUp to={totalThisMonth} /></p>
+          <p className="text-xs text-muted-foreground mt-0.5">Expenses</p>
         </motion.div>
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="glass rounded-2xl p-4">
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08 }} className="glass rounded-2xl p-4">
           <div className="w-8 h-8 rounded-xl bg-indigo-400/15 flex items-center justify-center mb-2">
-            <Target className="w-4 h-4 text-indigo-400" />
+            <PiggyBank className="w-4 h-4 text-indigo-400" />
           </div>
-          <p className="text-xl font-bold"><CountUp to={expenses?.length ?? 0} /></p>
-          <p className="text-xs text-muted-foreground mt-0.5">Transactions</p>
+          <p className="text-xl font-bold text-indigo-400">₹<CountUp to={totalSavings} /></p>
+          <p className="text-xs text-muted-foreground mt-0.5">Savings</p>
         </motion.div>
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="glass rounded-2xl p-4 col-span-2 sm:col-span-1">
-          <div className="w-8 h-8 rounded-xl bg-amber-400/15 flex items-center justify-center mb-2">
-            <span className="text-base">📅</span>
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.12 }} className="glass rounded-2xl p-4">
+          <div className="w-8 h-8 rounded-xl bg-primary/15 flex items-center justify-center mb-2">
+            <span className="text-sm">💵</span>
           </div>
-          <p className="text-xl font-bold">
-            ₹<CountUp to={expenses?.length ? Math.round(totalThisMonth / expenses.length) : 0} />
+          <p className={cn('text-xl font-bold', totalIncome === 0 ? 'text-muted-foreground' : freeCash >= 0 ? 'text-primary' : 'text-rose-400')}>
+            {freeCash < 0 ? '-' : ''}₹<CountUp to={Math.abs(freeCash)} />
           </p>
-          <p className="text-xs text-muted-foreground mt-0.5">Avg per transaction</p>
+          <p className="text-xs text-muted-foreground mt-0.5">Free Cash</p>
         </motion.div>
       </div>
 
-      <Tabs defaultValue="expenses">
-        <TabsList className="bg-white/5 border border-white/8 mb-6">
-          <TabsTrigger value="expenses" className="data-[state=active]:bg-primary data-[state=active]:text-[#0a0f1e]">
-            Expenses
-          </TabsTrigger>
-          <TabsTrigger value="analytics" className="data-[state=active]:bg-primary data-[state=active]:text-[#0a0f1e]">
-            Analytics
-          </TabsTrigger>
-          <TabsTrigger value="budget" className="data-[state=active]:bg-primary data-[state=active]:text-[#0a0f1e]">
-            Budgets
-          </TabsTrigger>
-        </TabsList>
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <div className="overflow-x-auto scrollbar-hide mb-6">
+          <TabsList className="bg-white/5 border border-white/8 w-max min-w-full">
+            {[
+              { value: 'overview', label: 'Overview' },
+              { value: 'expenses', label: 'Expenses' },
+              { value: 'income',   label: 'Income'   },
+              { value: 'savings',  label: 'Savings'  },
+              { value: 'analytics',label: 'Analytics'},
+              { value: 'budget',   label: 'Budgets'  },
+            ].map(tab => (
+              <TabsTrigger
+                key={tab.value}
+                value={tab.value}
+                className="data-[state=active]:bg-primary data-[state=active]:text-[#0a0f1e]"
+              >
+                {tab.label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </div>
+
+        <TabsContent value="overview">
+          <FinanceOverview userId={userId} month={selectedMonth} />
+        </TabsContent>
 
         <TabsContent value="expenses">
           {isLoading ? (
@@ -241,6 +311,16 @@ export function PersonalDashboard({ userId }: Props) {
                       <p className="text-sm font-medium truncate">{expense.title}</p>
                       <p className="text-xs text-muted-foreground">{format(new Date(expense.date), 'MMM d')} · {meta.label}</p>
                     </div>
+                    {expense.paid_from && (
+                      <span className={cn(
+                        'text-[10px] px-1.5 py-0.5 rounded-full shrink-0',
+                        expense.paid_from === 'income'
+                          ? 'bg-emerald-400/15 text-emerald-400'
+                          : 'bg-indigo-400/15 text-indigo-400'
+                      )}>
+                        {expense.paid_from === 'income' ? '💼' : '🐷'}
+                      </span>
+                    )}
                     <span className="font-semibold text-sm">{formatINR(expense.amount)}</span>
                     <button
                       onClick={() => deleteExpense.mutate(expense.id)}
@@ -253,6 +333,14 @@ export function PersonalDashboard({ userId }: Props) {
               })}
             </div>
           )}
+        </TabsContent>
+
+        <TabsContent value="income">
+          <IncomeTracker userId={userId} month={selectedMonth} />
+        </TabsContent>
+
+        <TabsContent value="savings">
+          <SavingsTracker userId={userId} month={selectedMonth} />
         </TabsContent>
 
         <TabsContent value="analytics">
@@ -311,6 +399,29 @@ export function PersonalDashboard({ userId }: Props) {
                   >
                     <span className="text-base">{meta.emoji}</span>
                     {meta.label.split(' ')[0]}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Paid from <span className="text-muted-foreground font-normal text-xs">(optional)</span></Label>
+              <div className="flex gap-2">
+                {(['income', 'savings'] as const).map((source) => (
+                  <button
+                    key={source}
+                    type="button"
+                    onClick={() => setValue('paid_from', selectedPaidFrom === source ? undefined : source)}
+                    className={cn(
+                      'flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl border text-sm transition-all',
+                      selectedPaidFrom === source
+                        ? source === 'income'
+                          ? 'border-emerald-400 bg-emerald-400/10 text-emerald-400'
+                          : 'border-indigo-400 bg-indigo-400/10 text-indigo-400'
+                        : 'border-white/10 bg-white/5 text-muted-foreground hover:bg-white/10'
+                    )}
+                  >
+                    {source === 'income' ? '💼' : '🐷'} {source === 'income' ? 'Income' : 'Savings'}
                   </button>
                 ))}
               </div>

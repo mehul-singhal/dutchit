@@ -222,6 +222,7 @@ export interface Database {
           category: ExpenseCategory
           date: string
           notes: string | null
+          paid_from: ExpenseFundingSource | null
           created_at: string
         }
         Insert: {
@@ -232,6 +233,7 @@ export interface Database {
           category: ExpenseCategory
           date: string
           notes?: string | null
+          paid_from?: ExpenseFundingSource | null
           created_at?: string
         }
         Update: {
@@ -242,6 +244,7 @@ export interface Database {
           category?: ExpenseCategory
           date?: string
           notes?: string | null
+          paid_from?: ExpenseFundingSource | null
           created_at?: string
         }
         Relationships: []
@@ -273,6 +276,93 @@ export interface Database {
         }
         Relationships: []
       }
+      personal_income: {
+        Row: {
+          id: string
+          user_id: string
+          source: IncomeSource
+          title: string
+          amount: number
+          month: number
+          year: number
+          notes: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          source: IncomeSource
+          title: string
+          amount: number
+          month: number
+          year: number
+          notes?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          source?: IncomeSource
+          title?: string
+          amount?: number
+          month?: number
+          year?: number
+          notes?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      personal_savings: {
+        Row: {
+          id: string
+          user_id: string
+          title: string
+          amount: number
+          date: string
+          notes: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          title: string
+          amount: number
+          date: string
+          notes?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          title?: string
+          amount?: number
+          date?: string
+          notes?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      personal_finance_settings: {
+        Row: {
+          user_id: string
+          monthly_savings_goal: number | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          user_id: string
+          monthly_savings_goal?: number | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          user_id?: string
+          monthly_savings_goal?: number | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: Record<string, never>
     Functions: Record<string, never>
@@ -286,6 +376,8 @@ export type MemberRole = 'admin' | 'member'
 export type SplitType = 'equal' | 'exact' | 'percentage' | 'shares' | 'adjustment' | 'settle'
 export type SettlementStatus = 'pending_confirmation' | 'confirmed' | 'disputed'
 export type ExpenseCategory = 'food' | 'travel' | 'accommodation' | 'entertainment' | 'shopping' | 'utilities' | 'other'
+export type ExpenseFundingSource = 'income' | 'savings'
+export type IncomeSource = 'salary' | 'freelance' | 'rental' | 'investment' | 'gift' | 'other'
 
 // Joined types
 export type UserProfile = Database['public']['Tables']['users']['Row']
@@ -306,6 +398,9 @@ export type Settlement = Database['public']['Tables']['settlements']['Row'] & {
 }
 export type PersonalExpense = Database['public']['Tables']['personal_expenses']['Row']
 export type Budget = Database['public']['Tables']['budgets']['Row']
+export type PersonalIncome = Database['public']['Tables']['personal_income']['Row']
+export type PersonalSavings = Database['public']['Tables']['personal_savings']['Row']
+export type PersonalFinanceSettings = Database['public']['Tables']['personal_finance_settings']['Row']
 
 // UI types
 export type Balance = {

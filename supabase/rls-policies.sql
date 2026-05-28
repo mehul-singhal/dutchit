@@ -12,6 +12,9 @@ alter table public.expense_splits enable row level security;
 alter table public.settlements enable row level security;
 alter table public.personal_expenses enable row level security;
 alter table public.budgets enable row level security;
+alter table public.personal_income enable row level security;
+alter table public.personal_savings enable row level security;
+alter table public.personal_finance_settings enable row level security;
 
 -- ============================================================
 -- USERS policies
@@ -249,6 +252,30 @@ create policy "Users can manage their own personal expenses"
 -- ============================================================
 create policy "Users can manage their own budgets"
   on public.budgets for all
+  using (user_id = auth.uid())
+  with check (user_id = auth.uid());
+
+-- ============================================================
+-- PERSONAL INCOME policies
+-- ============================================================
+create policy "Users can manage their own income"
+  on public.personal_income for all
+  using (user_id = auth.uid())
+  with check (user_id = auth.uid());
+
+-- ============================================================
+-- PERSONAL SAVINGS policies
+-- ============================================================
+create policy "Users can manage their own savings"
+  on public.personal_savings for all
+  using (user_id = auth.uid())
+  with check (user_id = auth.uid());
+
+-- ============================================================
+-- PERSONAL FINANCE SETTINGS policies
+-- ============================================================
+create policy "Users can manage their own finance settings"
+  on public.personal_finance_settings for all
   using (user_id = auth.uid())
   with check (user_id = auth.uid());
 

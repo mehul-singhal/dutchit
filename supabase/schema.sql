@@ -107,6 +107,8 @@ create table if not exists public.settlements (
 -- ============================================================
 -- PERSONAL EXPENSES
 -- ============================================================
+create type expense_funding_source as enum ('income', 'savings');
+
 create table if not exists public.personal_expenses (
   id uuid default uuid_generate_v4() primary key,
   user_id uuid references public.users(id) on delete cascade not null,
@@ -115,6 +117,7 @@ create table if not exists public.personal_expenses (
   category expense_category default 'other' not null,
   date date not null,
   notes text,
+  paid_from expense_funding_source default null,
   created_at timestamptz default now() not null
 );
 
@@ -129,6 +132,52 @@ create table if not exists public.budgets (
   month integer not null check (month >= 1 and month <= 12),
   year integer not null check (year >= 2020),
   unique(user_id, category, month, year)
+);
+
+-- ============================================================
+-- PERSONAL INCOME
+-- ============================================================
+create type income_source as enum ('salary', 'freelance', 'rental', 'investment', 'gift', 'other');
+
+create table if not exists public.personal_income (
+  id uuid default uuid_generate_v4() primary key,
+  user_id uuid references public.users(id) on delete cascade not null,
+  source income_source not null default 'salary',
+  title text not null,
+  amount numeric(10, 2) not null check (amount > 0),
+  month integer not null check (month >= 1 and month <= 12),
+  year integer not null check (year >= 2020),
+  notes text,
+  created_at timestamptz default now() not null
+);
+
+create index if not exists idx_personal_income_user_id on public.personal_income(user_id);
+create index if not exists idx_personal_income_user_month on public.personal_income(user_id, year, month);
+
+-- ============================================================
+-- PERSONAL SAVINGS
+-- ============================================================
+create table if not exists public.personal_savings (
+  id uuid default uuid_generate_v4() primary key,
+  user_id uuid references public.users(id) on delete cascade not null,
+  title text not null,
+  amount numeric(10, 2) not null check (amount > 0),
+  date date not null,
+  notes text,
+  created_at timestamptz default now() not null
+);
+
+create index if not exists idx_personal_savings_user_id on public.personal_savings(user_id);
+create index if not exists idx_personal_savings_user_date on public.personal_savings(user_id, date);
+
+-- ============================================================
+-- PERSONAL FINANCE SETTINGS (savings goal, etc.)
+-- ============================================================
+create table if not exists public.personal_finance_settings (
+  user_id uuid references public.users(id) on delete cascade primary key,
+  monthly_savings_goal numeric(10, 2) default null,
+  created_at timestamptz default now() not null,
+  updated_at timestamptz default now() not null
 );
 
 -- ============================================================
