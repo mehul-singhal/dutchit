@@ -5,7 +5,6 @@ import { Toaster } from '@/components/ui/sonner'
 import { Providers } from '@/components/providers'
 import { ServiceWorkerRegistrar } from '@/components/service-worker-registrar'
 import { OfflineBanner } from '@/components/offline-banner'
-import { OnlineSync } from '@/components/online-sync'
 
 const dmSans = DM_Sans({
   variable: '--font-dm-sans',
@@ -60,7 +59,6 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col">
         <Providers>{children}</Providers>
         <OfflineBanner />
-        <OnlineSync />
         <ServiceWorkerRegistrar />
         <Toaster
           position="top-right"

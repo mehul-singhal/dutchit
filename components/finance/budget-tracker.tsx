@@ -9,7 +9,6 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Progress } from '@/components/ui/progress'
 import { createClient } from '@/lib/supabase/client'
-import { MutationQueue } from '@/lib/mutation-queue'
 import { EXPENSE_CATEGORY_META } from '@/components/expenses/expense-category-meta'
 import { formatINR } from '@/lib/utils/formatters'
 import type { ExpenseCategory } from '@/types/database'
@@ -42,18 +41,13 @@ export function BudgetTracker({ userId, categoryTotals, month }: Props) {
 
   const saveBudget = useMutation({
     mutationFn: async ({ category, amount }: { category: ExpenseCategory; amount: number }) => {
-      const payload = {
+      const { error } = await supabase.from('budgets').upsert({
         user_id: userId,
         category,
         amount,
         month: month.getMonth() + 1,
         year: month.getFullYear(),
-      }
-      if (!navigator.onLine) {
-        MutationQueue.enqueue('budget:upsert', 'save-budget', payload)
-        return
-      }
-      const { error } = await supabase.from('budgets').upsert(payload)
+      })
       if (error) throw error
     },
     onSuccess: () => {
