@@ -30,6 +30,7 @@ import {
   calculateAdjustmentSplits,
 } from '@/lib/utils/split-calculator'
 import { getInitials, formatINR } from '@/lib/utils/formatters'
+import { MutationQueue } from '@/lib/mutation-queue'
 import type { SplitType, ExpenseCategory, UserProfile } from '@/types/database'
 import { cn } from '@/lib/utils'
 
@@ -272,7 +273,32 @@ export function AddExpenseSheet({ open, onOpenChange, groupId, userId, expense, 
     }
 
     if (isEditing && expense) {
-      // Update expense
+      const updatePayload = {
+        id: expense.id,
+        title: data.title,
+        amount: parseFloat(data.amount),
+        category: data.category,
+        date: data.date,
+        paid_by: data.paid_by,
+        notes: data.notes || null,
+        receipt_url: receiptUrl || null,
+        splits: splits.map((s) => ({
+          user_id: s.userId,
+          split_type: s.splitType,
+          amount: s.amount,
+          percentage: s.percentage ?? null,
+          shares: s.shares ?? null,
+          adjusted_amount: s.adjustedAmount ?? null,
+        })),
+      }
+
+      if (!navigator.onLine) {
+        MutationQueue.enqueue('expense:update', 'edit-expense', updatePayload)
+        toast.success(`"${data.title}" saved — will sync when online`)
+        onSuccess()
+        return
+      }
+
       const { error } = await supabase
         .from('expenses')
         .update({
@@ -286,64 +312,57 @@ export function AddExpenseSheet({ open, onOpenChange, groupId, userId, expense, 
         })
         .eq('id', expense.id)
 
-      if (error) {
-        toast.error('Failed to update expense')
-        return
-      }
+      if (error) { toast.error('Failed to update expense'); return }
 
-      // Replace splits: delete old, insert new
       await supabase.from('expense_splits').delete().eq('expense_id', expense.id)
       const { error: splitsError } = await supabase.from('expense_splits').insert(
-        splits.map((s) => ({
-          expense_id: expense.id,
-          user_id: s.userId,
-          split_type: s.splitType,
-          amount: s.amount,
-          percentage: s.percentage ?? null,
-          shares: s.shares ?? null,
-          adjusted_amount: s.adjustedAmount ?? null,
-        }))
+        updatePayload.splits.map((s) => ({ ...s, expense_id: expense.id }))
       )
-
-      if (splitsError) {
-        toast.error('Expense updated but failed to save splits')
-        return
-      }
+      if (splitsError) { toast.error('Expense updated but failed to save splits'); return }
 
       toast.success(`"${data.title}" updated!`)
     } else {
-      // Insert new expense
-      const { data: newExpense, error } = await supabase
-        .from('expenses')
-        .insert({
-          group_id: groupId,
-          title: data.title,
-          amount: parseFloat(data.amount),
-          category: data.category,
-          date: data.date,
-          paid_by: data.paid_by,
-          notes: data.notes || null,
-          receipt_url: receiptUrl || null,
-          created_by: userId,
-        })
-        .select()
-        .single()
-
-      if (error) {
-        toast.error('Failed to add expense')
-        return
-      }
-
-      const { error: splitsError } = await supabase.from('expense_splits').insert(
-        splits.map((s) => ({
-          expense_id: newExpense.id,
+      const addPayload = {
+        group_id: groupId,
+        title: data.title,
+        amount: parseFloat(data.amount),
+        category: data.category,
+        date: data.date,
+        paid_by: data.paid_by,
+        notes: data.notes || null,
+        receipt_url: receiptUrl || null,
+        created_by: userId,
+        splits: splits.map((s) => ({
           user_id: s.userId,
           split_type: s.splitType,
           amount: s.amount,
           percentage: s.percentage ?? null,
           shares: s.shares ?? null,
           adjusted_amount: s.adjustedAmount ?? null,
-        }))
+        })),
+      }
+
+      if (!navigator.onLine) {
+        MutationQueue.enqueue('expense:add', 'add-expense', addPayload)
+        toast.success(`"${data.title}" saved — will sync when online`)
+        reset()
+        setReceiptUrl('')
+        setSplitType('equal')
+        onSuccess()
+        return
+      }
+
+      const { splits: splitRows, ...expenseRow } = addPayload
+      const { data: newExpense, error } = await supabase
+        .from('expenses')
+        .insert(expenseRow)
+        .select()
+        .single()
+
+      if (error) { toast.error('Failed to add expense'); return }
+
+      const { error: splitsError } = await supabase.from('expense_splits').insert(
+        splitRows.map((s) => ({ ...s, expense_id: newExpense.id }))
       )
 
       if (splitsError) {

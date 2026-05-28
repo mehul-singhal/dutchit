@@ -13,6 +13,7 @@ import { formatINR, formatDate, getInitials } from '@/lib/utils/formatters'
 import { AddExpenseSheet } from '@/components/expenses/add-expense-sheet'
 import { EXPENSE_CATEGORY_META } from '@/components/expenses/expense-category-meta'
 import { useFabAction } from '@/lib/utils/fab'
+import { MutationQueue } from '@/lib/mutation-queue'
 import type { Expense, MemberRole, UserProfile, ExpenseCategory, SplitType } from '@/types/database'
 
 type ExpenseSplitWithUser = {
@@ -67,6 +68,10 @@ export function GroupExpenses({ groupId, userId, userRole }: Props) {
 
   const deleteExpense = useMutation({
     mutationFn: async (id: string) => {
+      if (!navigator.onLine) {
+        MutationQueue.enqueue('expense:delete', 'delete-expense', { id })
+        return
+      }
       const { error } = await supabase.from('expenses').delete().eq('id', id)
       if (error) throw error
     },

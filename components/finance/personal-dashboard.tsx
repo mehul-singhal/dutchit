@@ -15,6 +15,7 @@ import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { createClient } from '@/lib/supabase/client'
+import { MutationQueue } from '@/lib/mutation-queue'
 import { formatINR, formatMonthYear } from '@/lib/utils/formatters'
 import { EXPENSE_CATEGORY_META } from '@/components/expenses/expense-category-meta'
 import { SpendingChart } from '@/components/finance/spending-chart'
@@ -96,6 +97,10 @@ export function PersonalDashboard({ userId }: Props) {
 
   const deleteExpense = useMutation({
     mutationFn: async (id: string) => {
+      if (!navigator.onLine) {
+        MutationQueue.enqueue('personal-expense:delete', 'delete-personal-expense', { id })
+        return
+      }
       const { error } = await supabase.from('personal_expenses').delete().eq('id', id)
       if (error) throw error
     },
@@ -107,19 +112,25 @@ export function PersonalDashboard({ userId }: Props) {
   })
 
   async function onSubmit(data: ExpenseForm) {
-    const { error } = await supabase.from('personal_expenses').insert({
+    const payload = {
       user_id: userId,
       title: data.title,
       amount: parseFloat(data.amount),
       category: data.category,
       date: data.date,
       notes: data.notes || null,
-    })
+    }
 
-    if (error) {
-      toast.error('Failed to add expense')
+    if (!navigator.onLine) {
+      MutationQueue.enqueue('personal-expense:add', 'add-personal-expense', payload)
+      toast.success('Expense saved — will sync when online')
+      reset()
+      setAddOpen(false)
       return
     }
+
+    const { error } = await supabase.from('personal_expenses').insert(payload)
+    if (error) { toast.error('Failed to add expense'); return }
 
     queryClient.invalidateQueries({ queryKey: ['personal-expenses'] })
     queryClient.invalidateQueries({ queryKey: ['personal-chart'] })

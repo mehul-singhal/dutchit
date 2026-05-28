@@ -13,8 +13,10 @@ import { toast } from 'sonner'
 import confetti from 'canvas-confetti'
 import { CheckCircle, XCircle, Loader2, Copy, MessageSquare, ExternalLink } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { MutationQueue } from '@/lib/mutation-queue'
 import { formatINR, getInitials } from '@/lib/utils/formatters'
 import { buildUpiDeepLink, buildUpiQrString, getUpiAppFromId } from '@/lib/utils/upi'
+import type { SettlementStatus } from '@/types/database'
 import { UpiAppGrid } from '@/components/settlements/upi-app-grid'
 import { QrCodeDisplay } from '@/components/settlements/qr-code-display'
 import type { DebtSimplification, UpiApp } from '@/types/database'
@@ -68,16 +70,30 @@ export function UpiPaymentSheet({ debt, groupId, open, onOpenChange }: Props) {
   async function handlePaidConfirm() {
     setSubmitting(true)
     try {
-      const { error } = await supabase.from('settlements').insert({
+      const payload = {
         group_id: groupId,
         paid_by: debt.from,
         paid_to: debt.to,
         amount: debt.amount,
         upi_ref: upiRef || null,
         payment_app: selectedApp ? appNames[selectedApp] : null,
-        status: 'pending_confirmation',
-      })
+        status: 'pending_confirmation' as SettlementStatus,
+      }
 
+      if (!navigator.onLine) {
+        MutationQueue.enqueue('settlement:add', 'record-settlement', payload)
+        setStep('done')
+        confetti({
+          particleCount: 80,
+          spread: 60,
+          origin: { y: 0.7 },
+          colors: ['#00d4aa', '#6366f1', '#f59e0b'],
+        })
+        setSubmitting(false)
+        return
+      }
+
+      const { error } = await supabase.from('settlements').insert(payload)
       if (error) throw error
 
       queryClient.invalidateQueries({ queryKey: ['group-balances', groupId] })
