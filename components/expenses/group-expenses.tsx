@@ -292,6 +292,9 @@ export function GroupExpenses({ groupId, userId, userRole }: Props) {
               user_id: s.user_id,
               amount: s.amount,
               split_type: s.split_type,
+              percentage: s.percentage ?? null,
+              shares: s.shares ?? null,
+              adjusted_amount: s.adjusted_amount ?? null,
             })),
           }}
           onSuccess={() => {

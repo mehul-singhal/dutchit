@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -29,7 +29,7 @@ import {
   calculateShareSplits,
   calculateAdjustmentSplits,
 } from '@/lib/utils/split-calculator'
-import { getInitials } from '@/lib/utils/formatters'
+import { getInitials, formatINR } from '@/lib/utils/formatters'
 import type { SplitType, ExpenseCategory, UserProfile } from '@/types/database'
 import { cn } from '@/lib/utils'
 
@@ -53,7 +53,14 @@ interface ExpenseToEdit {
   paid_by: string
   notes: string | null
   receipt_url: string | null
-  expense_splits: Array<{ user_id: string; amount: number; split_type: SplitType }>
+  expense_splits: Array<{
+    user_id: string
+    amount: number
+    split_type: SplitType
+    percentage: number | null
+    shares: number | null
+    adjusted_amount: number | null
+  }>
 }
 
 interface Props {
@@ -72,6 +79,7 @@ export function AddExpenseSheet({ open, onOpenChange, groupId, userId, expense, 
   const [splitData, setSplitData] = useState<Record<string, number | boolean>>({})
   const [uploading, setUploading] = useState(false)
   const [receiptUrl, setReceiptUrl] = useState('')
+  const splitTypeInitRef = useRef(true)
   const supabase = createClient()
 
   const { register, handleSubmit, watch, reset, setValue, formState: { errors, isSubmitting } } =
@@ -89,6 +97,8 @@ export function AddExpenseSheet({ open, onOpenChange, groupId, userId, expense, 
   // Load members, then pre-fill if editing
   useEffect(() => {
     if (!open) return
+    // Mark that the next splitType change from pre-fill should not reset data
+    splitTypeInitRef.current = true
     supabase
       .from('group_members')
       .select('users(*)')
@@ -112,12 +122,35 @@ export function AddExpenseSheet({ open, onOpenChange, groupId, userId, expense, 
           const detectedType = expense.expense_splits[0]?.split_type ?? 'equal'
           setSplitType(detectedType)
 
-          // Pre-fill split data
+          // Pre-fill split data — restore the right value per split type
           if (detectedType === 'equal') {
             const d: Record<string, boolean> = {}
             users.forEach((u) => (d[u.id] = expense.expense_splits.some((s) => s.user_id === u.id)))
             setSplitData(d)
+          } else if (detectedType === 'percentage') {
+            const d: Record<string, number> = {}
+            users.forEach((u) => {
+              const s = expense.expense_splits.find((sp) => sp.user_id === u.id)
+              // percentage stored in split record; fall back to deriving from amount
+              d[u.id] = s ? (s.percentage ?? Math.round((s.amount / expense.amount) * 10000) / 100) : 0
+            })
+            setSplitData(d)
+          } else if (detectedType === 'shares') {
+            const d: Record<string, number> = {}
+            users.forEach((u) => {
+              const s = expense.expense_splits.find((sp) => sp.user_id === u.id)
+              d[u.id] = s ? (s.shares ?? 1) : 1
+            })
+            setSplitData(d)
+          } else if (detectedType === 'adjustment') {
+            const d: Record<string, number> = {}
+            users.forEach((u) => {
+              const s = expense.expense_splits.find((sp) => sp.user_id === u.id)
+              d[u.id] = s ? (s.adjusted_amount ?? 0) : 0
+            })
+            setSplitData(d)
           } else {
+            // exact — use stored amounts
             const d: Record<string, number> = {}
             users.forEach((u) => {
               const s = expense.expense_splits.find((sp) => sp.user_id === u.id)
@@ -141,17 +174,25 @@ export function AddExpenseSheet({ open, onOpenChange, groupId, userId, expense, 
       })
   }, [open, groupId, expense])
 
-  // Reset split data when split type changes (only for new expenses)
+  // Reset split data whenever split type changes
+  // We use a ref to track whether this is the initial load (from editing pre-fill) or a user-driven change
   useEffect(() => {
-    if (!members.length || isEditing) return
+    if (!members.length) return
+    // Skip the very first run after members load — the open-effect above already set splitData correctly
+    if (splitTypeInitRef.current) {
+      splitTypeInitRef.current = false
+      return
+    }
+    // User explicitly changed the split type — reset to sensible defaults
+    const currentAmount = parseFloat(watch('amount') || '0')
     if (splitType === 'equal') {
       const d: Record<string, boolean> = {}
       members.forEach((u) => (d[u.id] = true))
       setSplitData(d)
     } else if (splitType === 'exact') {
-      const perPerson = amount / members.length
+      const perPerson = currentAmount > 0 ? Math.round((currentAmount / members.length) * 100) / 100 : 0
       const d: Record<string, number> = {}
-      members.forEach((u) => (d[u.id] = Math.round(perPerson * 100) / 100))
+      members.forEach((u) => (d[u.id] = perPerson))
       setSplitData(d)
     } else if (splitType === 'percentage') {
       const pct = Math.round((100 / members.length) * 100) / 100
@@ -167,7 +208,8 @@ export function AddExpenseSheet({ open, onOpenChange, groupId, userId, expense, 
       members.forEach((u) => (d[u.id] = 0))
       setSplitData(d)
     }
-  }, [splitType, members.length])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [splitType])
 
   function computeSplits() {
     if (!amount || !members.length) return []
@@ -210,6 +252,23 @@ export function AddExpenseSheet({ open, onOpenChange, groupId, userId, expense, 
     if (!splits.length) {
       toast.error('No valid splits — check your inputs')
       return
+    }
+
+    // Validate totals before saving
+    if (splitType === 'percentage') {
+      const pctSum = members.reduce((s, m) => s + Number(splitData[m.id] ?? 0), 0)
+      if (Math.abs(pctSum - 100) > 0.5) {
+        toast.error(`Percentages must sum to 100% (currently ${pctSum.toFixed(1)}%)`)
+        return
+      }
+    }
+    if (splitType === 'exact') {
+      const amountSum = members.reduce((s, m) => s + Number(splitData[m.id] ?? 0), 0)
+      const total = parseFloat(data.amount)
+      if (Math.abs(amountSum - total) > 0.5) {
+        toast.error(`Exact amounts must sum to ${formatINR(total)} (currently ${formatINR(amountSum)})`)
+        return
+      }
     }
 
     if (isEditing && expense) {
@@ -401,7 +460,7 @@ export function AddExpenseSheet({ open, onOpenChange, groupId, userId, expense, 
             <SplitTypeSelector value={splitType} onChange={setSplitType} />
           </div>
 
-          {amount > 0 && (
+          {members.length > 0 && (
             <SplitInputs
               splitType={splitType}
               members={members}
