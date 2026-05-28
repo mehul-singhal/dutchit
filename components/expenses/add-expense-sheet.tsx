@@ -9,11 +9,11 @@ import { Loader2, Camera, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet'
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -216,15 +216,12 @@ export function AddExpenseSheet({ open, onOpenChange, groupId, userId, onSuccess
   const selectedPaidBy = watch('paid_by')
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent
-        side="right"
-        className="glass-strong border-l border-white/8 text-foreground w-full sm:max-w-md overflow-y-auto"
-      >
-        <SheetHeader className="mb-6">
-          <SheetTitle className="text-xl font-bold">Add Expense</SheetTitle>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="glass-strong border-white/10 text-foreground w-full max-w-md max-h-[90vh] overflow-y-auto">
+        <DialogHeader className="mb-2">
+          <DialogTitle className="text-xl font-bold">Add Expense</DialogTitle>
           <p className="text-sm text-muted-foreground">Who&apos;s footing the bill?</p>
-        </SheetHeader>
+        </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
           {/* Title + Amount */}
@@ -378,7 +375,7 @@ export function AddExpenseSheet({ open, onOpenChange, groupId, userId, onSuccess
             )}
           </Button>
         </form>
-      </SheetContent>
-    </Sheet>
+      </DialogContent>
+    </Dialog>
   )
 }

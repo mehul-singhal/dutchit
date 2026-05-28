@@ -14,6 +14,7 @@ import { GroupMembers } from '@/components/groups/group-members'
 import { GroupActivity } from '@/components/groups/group-activity'
 import { GroupSettingsDialog } from '@/components/groups/group-settings-dialog'
 import { GroupExportButton } from '@/components/groups/group-export-button'
+import { GroupAnalytics } from '@/components/groups/group-analytics'
 import type { Group, MemberRole } from '@/types/database'
 
 interface Props {
@@ -104,6 +105,9 @@ export function GroupDetail({ group: initialGroup, userId, userRole }: Props) {
           <TabsTrigger value="balances" className="data-[state=active]:bg-primary data-[state=active]:text-[#0a0f1e]">
             Balances
           </TabsTrigger>
+          <TabsTrigger value="analytics" className="data-[state=active]:bg-primary data-[state=active]:text-[#0a0f1e]">
+            Analytics
+          </TabsTrigger>
           <TabsTrigger value="members" className="data-[state=active]:bg-primary data-[state=active]:text-[#0a0f1e]">
             Members
           </TabsTrigger>
@@ -117,6 +121,9 @@ export function GroupDetail({ group: initialGroup, userId, userRole }: Props) {
         </TabsContent>
         <TabsContent value="balances">
           <GroupBalances groupId={group.id} userId={userId} />
+        </TabsContent>
+        <TabsContent value="analytics">
+          <GroupAnalytics groupId={group.id} userId={userId} />
         </TabsContent>
         <TabsContent value="members">
           <GroupMembers groupId={group.id} userId={userId} userRole={userRole} />
