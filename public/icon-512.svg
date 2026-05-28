@@ -7,13 +7,21 @@
   </defs>
   <rect width='512' height='512' rx='92' ry='92' fill='url(#teal)'/>
   <text
-    x='50%' y='54%'
+    x='38%' y='55%'
+    dominant-baseline='middle'
+    text-anchor='middle'
+    font-family='Arial Black, Arial, sans-serif'
+    font-weight='900'
+    font-size='215'
+    fill='#0a0f1e'
+  >D</text>
+  <text
+    x='72%' y='54%'
     dominant-baseline='middle'
     text-anchor='middle'
     font-family='Arial Black, Arial, sans-serif'
     font-weight='900'
     font-size='195'
-    letter-spacing='-10'
     fill='#0a0f1e'
-  >D|</text>
+  >!</text>
 </svg>

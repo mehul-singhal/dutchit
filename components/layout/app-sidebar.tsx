@@ -68,7 +68,7 @@ export function AppSidebar({ user }: Props) {
               exit={{ opacity: 0 }}
               className="w-8 h-8 rounded-xl gradient-teal flex items-center justify-center font-black text-[#0a0f1e] text-sm"
             >
-              D|
+              D!
             </motion.div>
           ) : (
             <motion.div
