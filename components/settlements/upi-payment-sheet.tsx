@@ -56,7 +56,7 @@ export function UpiPaymentSheet({ debt, groupId, open, onOpenChange }: Props) {
       upiId,
       name: recipient?.full_name ?? 'DutchIt User',
       amount: debt.amount,
-      note: 'DutchIt Settlement',
+      note: 'Dutch It! Settlement',
     })
 
     window.location.href = link
@@ -100,7 +100,7 @@ export function UpiPaymentSheet({ debt, groupId, open, onOpenChange }: Props) {
   }
 
   function copyReminder() {
-    const msg = `Hey ${recipient?.full_name?.split(' ')[0] ?? 'there'}! Add your UPI ID on DutchIt so I can pay you back easily. Join at ${window.location.origin}`
+    const msg = `Hey ${recipient?.full_name?.split(' ')[0] ?? 'there'}! Add your UPI ID on Dutch It! so I can pay you back easily. Join at ${window.location.origin}`
     navigator.clipboard.writeText(msg)
     toast.success('Reminder message copied! Paste it anywhere.')
   }

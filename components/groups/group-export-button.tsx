@@ -186,7 +186,7 @@ export function GroupExportButton({ groupId, groupName }: Props) {
 
       // Combine all sheets into one CSV with section headers
       const allRows: (string | number | null)[][] = [
-        [`DutchIt Export — ${groupName}`, `Generated: ${dateStr}`],
+        [`Dutch It! Export — ${groupName}`, `Generated: ${dateStr}`],
         [],
         ['=== EXPENSES ==='],
         ...expenseRows,

@@ -50,7 +50,7 @@ export function OnboardingStep3({ name, onFinish }: Props) {
           <span className="text-gradient">{name.split(' ')[0]}!</span>
         </h2>
         <p className="text-muted-foreground mb-2">
-          🎉 Welcome to DutchIt!
+          🎉 Welcome to Dutch It!
         </p>
         <p className="text-sm text-muted-foreground mb-8">
           Start by creating a group or adding your first expense. No more awkward money talks — we&apos;ve got you.

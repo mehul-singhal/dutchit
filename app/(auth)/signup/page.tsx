@@ -113,7 +113,7 @@ export default function SignupPage() {
       </div>
 
       <div className="glass rounded-2xl p-8 shadow-2xl">
-        <h1 className="text-2xl font-bold mb-1">Join DutchIt</h1>
+        <h1 className="text-2xl font-bold mb-1">Join Dutch It!</h1>
         <p className="text-muted-foreground text-sm mb-6">
           No more awkward "who owes whom" moments. Promise.
         </p>

@@ -14,18 +14,18 @@ const dmSans = DM_Sans({
 
 export const metadata: Metadata = {
   title: {
-    default: 'DutchIt — Split smart. Settle faster.',
-    template: '%s | DutchIt',
+    default: 'Dutch It! — Split smart. Settle faster.',
+    template: '%s | Dutch It!',
   },
   description:
     'The modern expense splitting app. Add expenses, track balances, and settle up with UPI — all in one place.',
   keywords: ['expense splitting', 'split bills', 'UPI payment', 'Splitwise alternative', 'group expenses'],
-  authors: [{ name: 'DutchIt' }],
+  authors: [{ name: 'Dutch It!' }],
   manifest: '/manifest.json',
   appleWebApp: {
       capable: true,
       statusBarStyle: 'black-translucent',
-      title: 'DutchIt',
+      title: 'Dutch It!',
       startupImage: '/apple-touch-icon.png',
     },
   icons: {
@@ -36,7 +36,7 @@ export const metadata: Metadata = {
     ],
   },
   openGraph: {
-    title: 'DutchIt — Split smart. Settle faster.',
+    title: 'Dutch It! — Split smart. Settle faster.',
     description: 'The modern expense splitting app built for India.',
     type: 'website',
   },

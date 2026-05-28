@@ -1,16 +1,16 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { getAuthUser } from '@/lib/auth'
 import { AppSidebar } from '@/components/layout/app-sidebar'
 import { MobileBottomNav } from '@/components/layout/mobile-bottom-nav'
 import { MobileHeader } from '@/components/layout/mobile-header'
 import type { UserProfile } from '@/types/database'
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
+  const user = await getAuthUser()
   if (!user) redirect('/login')
 
+  const supabase = await createClient()
   const { data: profileData } = await supabase
     .from('users')
     .select('*')

@@ -159,7 +159,7 @@ export function ProfileSettings({ profile, userEmail }: Props) {
 
       {/* App version */}
       <p className="text-center text-xs text-muted-foreground mt-6">
-        DutchIt v1.0.0 · MIT License · Open Source
+        Dutch It! v1.0.0 · MIT License · Open Source
       </p>
     </div>
   )

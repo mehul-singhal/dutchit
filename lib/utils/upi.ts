@@ -21,7 +21,7 @@ export function buildUpiDeepLink(
     note?: string
   }
 ): string {
-  const { upiId, name, amount, note = 'DutchIt Settlement' } = params
+  const { upiId, name, amount, note = 'Dutch It! Settlement' } = params
   const encodedName = encodeURIComponent(name)
   const encodedNote = encodeURIComponent(note)
   const amt = amount.toFixed(2)
@@ -50,7 +50,7 @@ export function buildUpiQrString(params: {
   amount: number
   note?: string
 }): string {
-  const { upiId, name, amount, note = 'DutchIt Settlement' } = params
+  const { upiId, name, amount, note = 'Dutch It! Settlement' } = params
   const encodedName = encodeURIComponent(name)
   const encodedNote = encodeURIComponent(note)
   return `upi://pay?pa=${upiId}&pn=${encodedName}&am=${amount.toFixed(2)}&cu=INR&tn=${encodedNote}`
