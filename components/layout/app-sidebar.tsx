@@ -126,7 +126,7 @@ export function AppSidebar({ user }: Props) {
       {/* User section */}
       <div className="border-t border-white/8 p-3 space-y-1">
         <Link
-          href="/profile/settings"
+          href="/profile"
           className="flex items-center gap-3 px-3 py-2 rounded-xl text-muted-foreground hover:bg-white/5 hover:text-foreground transition-colors"
         >
           <Settings className="w-5 h-5 shrink-0" />

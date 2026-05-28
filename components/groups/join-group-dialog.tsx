@@ -64,7 +64,7 @@ export function JoinGroupDialog({ open, onOpenChange, userId, prefillCode, onSuc
       .select('id')
       .eq('group_id', group.id)
       .eq('user_id', userId)
-      .single()
+      .maybeSingle()
 
     if (existing) {
       toast.info(`You're already in "${group.name}"!`)
