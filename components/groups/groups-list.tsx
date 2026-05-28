@@ -30,7 +30,7 @@ export function GroupsList({ userId }: Props) {
   useEffect(() => {
     const code = searchParams.get('join')
     if (code) {
-      setPrefillCode(code.toUpperCase())
+      setPrefillCode(code)
       setJoinOpen(true)
     }
   }, [searchParams])

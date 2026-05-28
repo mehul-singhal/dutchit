@@ -18,7 +18,7 @@ import { Label } from '@/components/ui/label'
 import { createClient } from '@/lib/supabase/client'
 
 const schema = z.object({
-  inviteCode: z.string().length(12, 'Invite codes are 12 characters').toUpperCase(),
+  inviteCode: z.string().length(12, 'Invite codes are 12 characters'),
 })
 
 type FormData = z.infer<typeof schema>
@@ -50,8 +50,8 @@ export function JoinGroupDialog({ open, onOpenChange, userId, prefillCode, onSuc
     const { data: group, error } = await supabase
       .from('groups')
       .select('id, name')
-      .eq('invite_code', data.inviteCode)
-      .single()
+      .eq('invite_code', data.inviteCode.toLowerCase())
+      .maybeSingle()
 
     if (error || !group) {
       toast.error('Invalid invite code. Double-check and try again!')
@@ -102,7 +102,7 @@ export function JoinGroupDialog({ open, onOpenChange, userId, prefillCode, onSuc
               <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
                 placeholder="e.g. ABC123DEF456"
-                className="pl-9 bg-white/5 border-white/10 h-11 uppercase tracking-widest"
+                className="pl-9 bg-white/5 border-white/10 h-11 tracking-widest"
                 {...register('inviteCode')}
               />
             </div>
