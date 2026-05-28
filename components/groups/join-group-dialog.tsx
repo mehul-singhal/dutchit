@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -27,15 +27,23 @@ interface Props {
   open: boolean
   onOpenChange: (open: boolean) => void
   userId: string
+  prefillCode?: string
   onSuccess: () => void
 }
 
-export function JoinGroupDialog({ open, onOpenChange, userId, onSuccess }: Props) {
+export function JoinGroupDialog({ open, onOpenChange, userId, prefillCode, onSuccess }: Props) {
   const supabase = createClient()
 
-  const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<FormData>({
+  const { register, handleSubmit, reset, setValue, formState: { errors, isSubmitting } } = useForm<FormData>({
     resolver: zodResolver(schema),
   })
+
+  // Pre-fill the code when opened via invite link
+  useEffect(() => {
+    if (prefillCode) {
+      setValue('inviteCode', prefillCode)
+    }
+  }, [prefillCode, setValue])
 
   async function onSubmit(data: FormData) {
     // Find group by invite code

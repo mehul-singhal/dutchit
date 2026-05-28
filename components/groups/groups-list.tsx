@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Plus, Search } from 'lucide-react'
@@ -20,8 +21,19 @@ export function GroupsList({ userId }: Props) {
   const [search, setSearch] = useState('')
   const [createOpen, setCreateOpen] = useState(false)
   const [joinOpen, setJoinOpen] = useState(false)
+  const [prefillCode, setPrefillCode] = useState('')
+  const searchParams = useSearchParams()
   const supabase = createClient()
   const queryClient = useQueryClient()
+
+  // Auto-open join dialog when ?join=CODE is in the URL
+  useEffect(() => {
+    const code = searchParams.get('join')
+    if (code) {
+      setPrefillCode(code.toUpperCase())
+      setJoinOpen(true)
+    }
+  }, [searchParams])
 
   const { data: groups, isLoading } = useQuery({
     queryKey: ['groups', userId],
@@ -142,6 +154,7 @@ export function GroupsList({ userId }: Props) {
         open={joinOpen}
         onOpenChange={setJoinOpen}
         userId={userId}
+        prefillCode={prefillCode}
         onSuccess={() => {
           queryClient.invalidateQueries({ queryKey: ['groups'] })
           setJoinOpen(false)
