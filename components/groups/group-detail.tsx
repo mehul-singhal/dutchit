@@ -12,6 +12,7 @@ import { GroupExpenses } from '@/components/expenses/group-expenses'
 import { GroupBalances } from '@/components/groups/group-balances'
 import { GroupMembers } from '@/components/groups/group-members'
 import { GroupActivity } from '@/components/groups/group-activity'
+import { GroupSettingsDialog } from '@/components/groups/group-settings-dialog'
 import type { Group, MemberRole } from '@/types/database'
 
 interface Props {
@@ -20,8 +21,10 @@ interface Props {
   userRole: MemberRole
 }
 
-export function GroupDetail({ group, userId, userRole }: Props) {
+export function GroupDetail({ group: initialGroup, userId, userRole }: Props) {
   const [copied, setCopied] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [group, setGroup] = useState(initialGroup)
   const meta = GROUP_CATEGORY_META[group.category]
 
   async function copyInviteLink() {
@@ -68,7 +71,12 @@ export function GroupDetail({ group, userId, userRole }: Props) {
             <span className="hidden sm:inline">Invite</span>
           </Button>
           {userRole === 'admin' && (
-            <Button variant="outline" size="icon" className="border-white/10 hover:bg-white/5 w-8 h-8">
+            <Button
+              variant="outline"
+              size="icon"
+              className="border-white/10 hover:bg-white/5 w-8 h-8"
+              onClick={() => setSettingsOpen(true)}
+            >
               <Settings className="w-3.5 h-3.5" />
             </Button>
           )}
@@ -115,6 +123,15 @@ export function GroupDetail({ group, userId, userRole }: Props) {
           <GroupActivity groupId={group.id} />
         </TabsContent>
       </Tabs>
+
+      {userRole === 'admin' && (
+        <GroupSettingsDialog
+          open={settingsOpen}
+          onOpenChange={setSettingsOpen}
+          group={group}
+          onUpdated={(updated) => setGroup((prev) => ({ ...prev, ...updated }))}
+        />
+      )}
     </div>
   )
 }
