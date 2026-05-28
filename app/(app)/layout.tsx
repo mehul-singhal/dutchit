@@ -1,9 +1,26 @@
 import { redirect } from 'next/navigation'
+import { unstable_cache } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { AppSidebar } from '@/components/layout/app-sidebar'
 import { MobileBottomNav } from '@/components/layout/mobile-bottom-nav'
 import { MobileHeader } from '@/components/layout/mobile-header'
 import type { UserProfile } from '@/types/database'
+
+async function getUserProfile(userId: string): Promise<UserProfile | null> {
+  const supabase = await createClient()
+  const { data } = await supabase
+    .from('users')
+    .select('*')
+    .eq('id', userId)
+    .single()
+  return data as UserProfile | null
+}
+
+const getCachedUserProfile = unstable_cache(
+  getUserProfile,
+  ['user-profile'],
+  { revalidate: 30, tags: ['user-profile'] }
+)
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient()
@@ -11,13 +28,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   if (!user) redirect('/login')
 
-  const { data: profileData } = await supabase
-    .from('users')
-    .select('*')
-    .eq('id', user.id)
-    .single()
-
-  const profile = profileData as UserProfile | null
+  const profile = await getCachedUserProfile(user.id)
 
   if (!profile?.onboarding_complete) redirect('/onboarding')
 

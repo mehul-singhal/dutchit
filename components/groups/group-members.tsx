@@ -112,7 +112,7 @@ export function GroupMembers({ groupId, userId, userRole }: Props) {
               key={member.id}
               initial={{ opacity: 0, x: -10 }}
               animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: i * 0.05 }}
+              transition={{ delay: i * 0.03 }}
               className="glass rounded-xl p-3 flex items-center gap-3"
             >
               <Avatar className="w-9 h-9 shrink-0">

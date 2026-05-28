@@ -172,7 +172,7 @@ export function GroupAnalytics({ groupId, userId }: Props) {
             key={s.label}
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.05 }}
+            transition={{ delay: i * 0.03 }}
             className="glass rounded-xl p-4"
           >
             <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">{s.label}</p>

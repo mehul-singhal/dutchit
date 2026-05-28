@@ -71,7 +71,7 @@ export function GroupsSummary({ userId }: Props) {
               key={group.id}
               initial={{ opacity: 0, x: -10 }}
               animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: i * 0.05 }}
+              transition={{ delay: i * 0.03 }}
             >
               <Link
                 href={`/groups/${group.id}`}

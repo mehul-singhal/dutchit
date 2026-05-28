@@ -35,7 +35,7 @@ export function UpiAppGrid({ upiId, onAppClick }: Props) {
             key={app.app}
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: i * 0.07 }}
+            transition={{ delay: i * 0.04 }}
             whileHover={{ scale: 1.08 }}
             whileTap={{ scale: 0.95 }}
             type="button"

@@ -148,7 +148,7 @@ export function DashboardStats({ userId }: Props) {
             key={card.label}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.08 }}
+            transition={{ delay: i * 0.04 }}
             className={`glass rounded-2xl p-4 border ${card.border}`}
           >
             <div className={`w-9 h-9 rounded-xl ${card.bg} flex items-center justify-center mb-3`}>

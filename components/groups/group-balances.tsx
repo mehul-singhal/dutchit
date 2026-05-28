@@ -221,7 +221,7 @@ export function GroupBalances({ groupId, userId }: Props) {
                   key={i}
                   initial={{ opacity: 0, x: -10 }}
                   animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: i * 0.05 }}
+                  transition={{ delay: i * 0.03 }}
                   className="glass rounded-xl p-4 flex items-center gap-4"
                 >
                   <UserAvatar user={debt.fromUser} />

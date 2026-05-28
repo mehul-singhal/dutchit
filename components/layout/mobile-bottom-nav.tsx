@@ -27,7 +27,7 @@ export function MobileBottomNav() {
   const fabLabel = getFabLabel(pathname)
 
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 glass-strong border-t border-white/8">
+    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 glass-strong border-t border-white/8" style={{ transform: 'translateZ(0)' }}>
       <div className="flex items-center justify-around px-2 h-16 safe-area-bottom">
         {NAV_ITEMS.slice(0, 2).map((item) => {
           const Icon = item.icon
