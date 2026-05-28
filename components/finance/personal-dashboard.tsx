@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
 import { format, startOfMonth, endOfMonth, subMonths } from 'date-fns'
-import { Plus, TrendingDown, TrendingUp, PiggyBank, Loader2, Trash2 } from 'lucide-react'
+import { Plus, Loader2, Trash2 } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -15,16 +15,15 @@ import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { createClient } from '@/lib/supabase/client'
-import { formatINR, formatMonthYear } from '@/lib/utils/formatters'
+import { formatINR } from '@/lib/utils/formatters'
 import { EXPENSE_CATEGORY_META } from '@/components/expenses/expense-category-meta'
 import { SpendingChart } from '@/components/finance/spending-chart'
 import { CategoryBreakdown } from '@/components/finance/category-breakdown'
 import { BudgetTracker } from '@/components/finance/budget-tracker'
 import { IncomeTracker } from '@/components/finance/income-tracker'
 import { SavingsTracker } from '@/components/finance/savings-tracker'
-import { FinanceOverview } from '@/components/finance/finance-overview'
 import { CountUp } from '@/components/animations/count-up'
-import type { ExpenseCategory, ExpenseFundingSource } from '@/types/database'
+import type { ExpenseCategory } from '@/types/database'
 import { cn } from '@/lib/utils'
 
 const expenseSchema = z.object({
@@ -35,7 +34,6 @@ const expenseSchema = z.object({
   notes: z.string().optional(),
   paid_from: z.enum(['income', 'savings']).optional(),
 })
-
 type ExpenseForm = z.infer<typeof expenseSchema>
 
 interface Props {
@@ -44,19 +42,15 @@ interface Props {
 
 export function PersonalDashboard({ userId }: Props) {
   const [addOpen, setAddOpen] = useState(false)
-  const [activeTab, setActiveTab] = useState('overview')
+  const [activeTab, setActiveTab] = useState('expenses')
   const [selectedMonth, setSelectedMonth] = useState(new Date())
   const supabase = createClient()
   const queryClient = useQueryClient()
 
   const { register, handleSubmit, watch, setValue, reset, formState: { errors, isSubmitting } } = useForm<ExpenseForm>({
     resolver: zodResolver(expenseSchema),
-    defaultValues: {
-      category: 'other',
-      date: format(new Date(), 'yyyy-MM-dd'),
-    },
+    defaultValues: { category: 'other', date: format(new Date(), 'yyyy-MM-dd') },
   })
-
   const selectedCategory = watch('category')
   const selectedPaidFrom = watch('paid_from')
 
@@ -67,33 +61,20 @@ export function PersonalDashboard({ userId }: Props) {
     queryKey: ['personal-expenses', userId, monthStart],
     queryFn: async () => {
       const { data } = await supabase
-        .from('personal_expenses')
-        .select('*')
-        .eq('user_id', userId)
-        .gte('date', monthStart)
-        .lte('date', monthEnd)
-        .order('date', { ascending: false })
+        .from('personal_expenses').select('*').eq('user_id', userId)
+        .gte('date', monthStart).lte('date', monthEnd).order('date', { ascending: false })
       return data ?? []
     },
   })
 
-  // Monthly totals for stat cards (income + savings)
   const { data: monthlyTotals } = useQuery({
     queryKey: ['monthly-totals', userId, monthStart],
     queryFn: async () => {
       const [incomeRes, savingsRes] = await Promise.all([
-        supabase
-          .from('personal_income')
-          .select('amount')
-          .eq('user_id', userId)
-          .eq('month', selectedMonth.getMonth() + 1)
-          .eq('year', selectedMonth.getFullYear()),
-        supabase
-          .from('personal_savings')
-          .select('amount')
-          .eq('user_id', userId)
-          .gte('date', monthStart)
-          .lte('date', monthEnd),
+        supabase.from('personal_income').select('amount').eq('user_id', userId)
+          .eq('month', selectedMonth.getMonth() + 1).eq('year', selectedMonth.getFullYear()),
+        supabase.from('personal_savings').select('amount').eq('user_id', userId)
+          .gte('date', monthStart).lte('date', monthEnd),
       ])
       return {
         totalIncome: (incomeRes.data ?? []).reduce((s, r) => s + r.amount, 0),
@@ -102,25 +83,23 @@ export function PersonalDashboard({ userId }: Props) {
     },
   })
 
-  // Last 6 months for chart
   const { data: chartData } = useQuery({
     queryKey: ['personal-chart', userId],
     queryFn: async () => {
       const months = Array.from({ length: 6 }, (_, i) => subMonths(new Date(), 5 - i))
-      const results = await Promise.all(
-        months.map(async (month) => {
-          const start = startOfMonth(month).toISOString().split('T')[0]
-          const end = endOfMonth(month).toISOString().split('T')[0]
-          const [expRes, incRes] = await Promise.all([
-            supabase.from('personal_expenses').select('amount').eq('user_id', userId).gte('date', start).lte('date', end),
-            supabase.from('personal_income').select('amount').eq('user_id', userId).eq('month', month.getMonth() + 1).eq('year', month.getFullYear()),
-          ])
-          const total = (expRes.data ?? []).reduce((s, e) => s + e.amount, 0)
-          const income = (incRes.data ?? []).reduce((s, e) => s + e.amount, 0)
-          return { month: format(month, 'MMM'), total, income }
-        })
-      )
-      return results
+      return Promise.all(months.map(async (month) => {
+        const start = startOfMonth(month).toISOString().split('T')[0]
+        const end = endOfMonth(month).toISOString().split('T')[0]
+        const [expRes, incRes] = await Promise.all([
+          supabase.from('personal_expenses').select('amount').eq('user_id', userId).gte('date', start).lte('date', end),
+          supabase.from('personal_income').select('amount').eq('user_id', userId).eq('month', month.getMonth() + 1).eq('year', month.getFullYear()),
+        ])
+        return {
+          month: format(month, 'MMM'),
+          total: (expRes.data ?? []).reduce((s, e) => s + e.amount, 0),
+          income: (incRes.data ?? []).reduce((s, e) => s + e.amount, 0),
+        }
+      }))
     },
   })
 
@@ -132,7 +111,7 @@ export function PersonalDashboard({ userId }: Props) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['personal-expenses'] })
       queryClient.invalidateQueries({ queryKey: ['personal-chart'] })
-      queryClient.invalidateQueries({ queryKey: ['finance-overview'] })
+      queryClient.invalidateQueries({ queryKey: ['monthly-totals'] })
       toast.success('Expense deleted')
     },
   })
@@ -147,63 +126,49 @@ export function PersonalDashboard({ userId }: Props) {
       notes: data.notes || null,
       paid_from: data.paid_from ?? null,
     })
-
-    if (error) {
-      toast.error('Failed to add expense')
-      return
-    }
-
+    if (error) { toast.error('Failed to add expense'); return }
     queryClient.invalidateQueries({ queryKey: ['personal-expenses'] })
     queryClient.invalidateQueries({ queryKey: ['personal-chart'] })
-    queryClient.invalidateQueries({ queryKey: ['finance-overview'] })
+    queryClient.invalidateQueries({ queryKey: ['monthly-totals'] })
     toast.success('Expense added!')
     reset()
     setAddOpen(false)
   }
 
-  const totalThisMonth = expenses?.reduce((s, e) => s + e.amount, 0) ?? 0
+  const totalExpenses = expenses?.reduce((s, e) => s + e.amount, 0) ?? 0
   const totalIncome = monthlyTotals?.totalIncome ?? 0
   const totalSavings = monthlyTotals?.totalSavings ?? 0
-  const freeCash = totalIncome - totalThisMonth - totalSavings
+  const freeCash = totalIncome - totalExpenses - totalSavings
+  const savingsRate = totalIncome > 0 ? (totalSavings / totalIncome) * 100 : null
   const categories = Object.entries(EXPENSE_CATEGORY_META) as [ExpenseCategory, { label: string; emoji: string }][]
-
   const categoryTotals = expenses?.reduce((acc, e) => {
     acc[e.category] = (acc[e.category] ?? 0) + e.amount
     return acc
   }, {} as Record<string, number>) ?? {}
 
-  const addButtonLabel =
-    activeTab === 'income' ? '+ Income' :
-    activeTab === 'savings' ? '+ Savings' :
-    '+ Expense'
-
-  function handleAddClick() {
-    if (activeTab === 'income' || activeTab === 'savings') {
-      // Handled inside child components via their own + buttons
-      // This button is only shown for expense-related tabs
-    }
-    setAddOpen(true)
-  }
+  // Cash flow bar (% of income, or expenses+savings if no income)
+  const barBase = totalIncome > 0 ? totalIncome : (totalExpenses + totalSavings || 1)
+  const expPct  = Math.min((totalExpenses / barBase) * 100, 100)
+  const savPct  = Math.min((totalSavings  / barBase) * 100, Math.max(0, 100 - expPct))
+  const freePct = Math.max(0, 100 - expPct - savPct)
 
   return (
     <div className="max-w-4xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-5">
         <div>
           <h1 className="text-2xl font-bold">My Finance</h1>
-          <p className="text-muted-foreground text-sm mt-1">Track your income, expenses &amp; savings</p>
+          <p className="text-muted-foreground text-sm mt-0.5">{format(selectedMonth, 'MMMM yyyy')}</p>
         </div>
         {activeTab !== 'income' && activeTab !== 'savings' && (
-          <Button
-            className="gradient-teal text-[#0a0f1e] font-semibold gap-1"
-            onClick={() => setAddOpen(true)}
-          >
+          <Button className="gradient-teal text-[#0a0f1e] font-semibold gap-1" onClick={() => setAddOpen(true)}>
             <Plus className="w-4 h-4" /> Add
           </Button>
         )}
       </div>
 
       {/* Month selector */}
-      <div className="flex gap-2 mb-6 overflow-x-auto scrollbar-hide pb-1">
+      <div className="flex gap-2 mb-5 overflow-x-auto scrollbar-hide pb-1">
         {Array.from({ length: 6 }, (_, i) => subMonths(new Date(), 5 - i)).map((month) => {
           const isSelected = format(month, 'yyyy-MM') === format(selectedMonth, 'yyyy-MM')
           return (
@@ -212,9 +177,7 @@ export function PersonalDashboard({ userId }: Props) {
               onClick={() => setSelectedMonth(month)}
               className={cn(
                 'shrink-0 px-4 py-2 rounded-xl text-sm font-medium transition-all border',
-                isSelected
-                  ? 'bg-primary text-[#0a0f1e] border-primary'
-                  : 'border-white/10 bg-white/5 text-muted-foreground hover:bg-white/10'
+                isSelected ? 'bg-primary text-[#0a0f1e] border-primary' : 'border-white/10 bg-white/5 text-muted-foreground hover:bg-white/10'
               )}
             >
               {format(month, 'MMM yy')}
@@ -223,65 +186,76 @@ export function PersonalDashboard({ userId }: Props) {
         })}
       </div>
 
-      {/* Stats — 4 cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="glass rounded-2xl p-4">
-          <div className="w-8 h-8 rounded-xl bg-emerald-400/15 flex items-center justify-center mb-2">
-            <TrendingUp className="w-4 h-4 text-emerald-400" />
+      {/* Summary card — Income / Spent / Saved + cash flow bar */}
+      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="glass rounded-2xl p-5 mb-5">
+        <div className="grid grid-cols-3 gap-2 mb-4">
+          <div>
+            <p className="text-[11px] text-muted-foreground uppercase tracking-wide mb-0.5">Income</p>
+            <p className="text-lg font-bold text-emerald-400">₹<CountUp to={totalIncome} /></p>
           </div>
-          <p className="text-xl font-bold text-emerald-400">₹<CountUp to={totalIncome} /></p>
-          <p className="text-xs text-muted-foreground mt-0.5">Income</p>
-        </motion.div>
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.04 }} className="glass rounded-2xl p-4">
-          <div className="w-8 h-8 rounded-xl bg-rose-400/15 flex items-center justify-center mb-2">
-            <TrendingDown className="w-4 h-4 text-rose-400" />
+          <div className="text-center">
+            <p className="text-[11px] text-muted-foreground uppercase tracking-wide mb-0.5">Spent</p>
+            <p className="text-lg font-bold text-rose-400">₹<CountUp to={totalExpenses} /></p>
           </div>
-          <p className="text-xl font-bold text-rose-400">₹<CountUp to={totalThisMonth} /></p>
-          <p className="text-xs text-muted-foreground mt-0.5">Expenses</p>
-        </motion.div>
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08 }} className="glass rounded-2xl p-4">
-          <div className="w-8 h-8 rounded-xl bg-indigo-400/15 flex items-center justify-center mb-2">
-            <PiggyBank className="w-4 h-4 text-indigo-400" />
+          <div className="text-right">
+            <p className="text-[11px] text-muted-foreground uppercase tracking-wide mb-0.5">Saved</p>
+            <p className="text-lg font-bold text-indigo-400">₹<CountUp to={totalSavings} /></p>
           </div>
-          <p className="text-xl font-bold text-indigo-400">₹<CountUp to={totalSavings} /></p>
-          <p className="text-xs text-muted-foreground mt-0.5">Savings</p>
-        </motion.div>
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.12 }} className="glass rounded-2xl p-4">
-          <div className="w-8 h-8 rounded-xl bg-primary/15 flex items-center justify-center mb-2">
-            <span className="text-sm">💵</span>
-          </div>
-          <p className={cn('text-xl font-bold', totalIncome === 0 ? 'text-muted-foreground' : freeCash >= 0 ? 'text-primary' : 'text-rose-400')}>
-            {freeCash < 0 ? '-' : ''}₹<CountUp to={Math.abs(freeCash)} />
-          </p>
-          <p className="text-xs text-muted-foreground mt-0.5">Free Cash</p>
-        </motion.div>
-      </div>
-
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <div className="overflow-x-auto scrollbar-hide mb-6">
-          <TabsList className="bg-white/5 border border-white/8 w-max min-w-full">
-            {[
-              { value: 'overview', label: 'Overview' },
-              { value: 'expenses', label: 'Expenses' },
-              { value: 'income',   label: 'Income'   },
-              { value: 'savings',  label: 'Savings'  },
-              { value: 'analytics',label: 'Analytics'},
-              { value: 'budget',   label: 'Budgets'  },
-            ].map(tab => (
-              <TabsTrigger
-                key={tab.value}
-                value={tab.value}
-                className="data-[state=active]:bg-primary data-[state=active]:text-[#0a0f1e]"
-              >
-                {tab.label}
-              </TabsTrigger>
-            ))}
-          </TabsList>
         </div>
 
-        <TabsContent value="overview">
-          <FinanceOverview userId={userId} month={selectedMonth} />
-        </TabsContent>
+        {/* Animated cash flow bar */}
+        <div className="h-2.5 rounded-full overflow-hidden flex bg-white/8 mb-2">
+          {expPct > 0 && (
+            <motion.div className="bg-rose-400 h-full" initial={{ width: 0 }} animate={{ width: `${expPct}%` }} transition={{ duration: 0.5, ease: 'easeOut' }} />
+          )}
+          {savPct > 0 && (
+            <motion.div className="bg-indigo-400 h-full" initial={{ width: 0 }} animate={{ width: `${savPct}%` }} transition={{ duration: 0.5, ease: 'easeOut', delay: 0.1 }} />
+          )}
+          {freePct > 0 && totalIncome > 0 && (
+            <motion.div className="bg-emerald-400/50 h-full" initial={{ width: 0 }} animate={{ width: `${freePct}%` }} transition={{ duration: 0.5, ease: 'easeOut', delay: 0.2 }} />
+          )}
+        </div>
+
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
+            <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-rose-400 inline-block" />Spent</span>
+            <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-indigo-400 inline-block" />Saved</span>
+            {totalIncome > 0 && <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-emerald-400/70 inline-block" />Free</span>}
+          </div>
+          {totalIncome > 0 ? (
+            <div className="flex items-center gap-2">
+              <span className={cn(
+                'text-xs font-semibold px-2 py-0.5 rounded-full',
+                savingsRate! >= 20 ? 'bg-emerald-400/15 text-emerald-400' :
+                savingsRate! >= 5  ? 'bg-amber-400/15 text-amber-400' :
+                                     'bg-rose-400/15 text-rose-400'
+              )}>
+                {savingsRate!.toFixed(0)}% saved
+              </span>
+              <span className={cn('text-sm font-bold', freeCash >= 0 ? 'text-primary' : 'text-rose-400')}>
+                {freeCash < 0 ? '-' : '+'}₹<CountUp to={Math.abs(freeCash)} />
+              </span>
+            </div>
+          ) : (
+            <span className="text-xs text-muted-foreground">Add income to see cash flow</span>
+          )}
+        </div>
+      </motion.div>
+
+      {/* 4 tabs — no Budgets tab, merged into Analytics */}
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="bg-white/5 border border-white/8 mb-5 w-full grid grid-cols-4">
+          {[
+            { value: 'expenses', label: 'Expenses' },
+            { value: 'income',   label: 'Income'   },
+            { value: 'savings',  label: 'Savings'  },
+            { value: 'analytics',label: 'Analytics'},
+          ].map(tab => (
+            <TabsTrigger key={tab.value} value={tab.value} className="data-[state=active]:bg-primary data-[state=active]:text-[#0a0f1e]">
+              {tab.label}
+            </TabsTrigger>
+          ))}
+        </TabsList>
 
         <TabsContent value="expenses">
           {isLoading ? (
@@ -314,18 +288,13 @@ export function PersonalDashboard({ userId }: Props) {
                     {expense.paid_from && (
                       <span className={cn(
                         'text-[10px] px-1.5 py-0.5 rounded-full shrink-0',
-                        expense.paid_from === 'income'
-                          ? 'bg-emerald-400/15 text-emerald-400'
-                          : 'bg-indigo-400/15 text-indigo-400'
+                        expense.paid_from === 'income' ? 'bg-emerald-400/15 text-emerald-400' : 'bg-indigo-400/15 text-indigo-400'
                       )}>
                         {expense.paid_from === 'income' ? '💼' : '🐷'}
                       </span>
                     )}
                     <span className="font-semibold text-sm">{formatINR(expense.amount)}</span>
-                    <button
-                      onClick={() => deleteExpense.mutate(expense.id)}
-                      className="opacity-0 group-hover:opacity-100 p-1 text-muted-foreground hover:text-rose-400 transition-all"
-                    >
+                    <button onClick={() => deleteExpense.mutate(expense.id)} className="opacity-0 group-hover:opacity-100 p-1 text-muted-foreground hover:text-rose-400 transition-all">
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </motion.div>
@@ -344,14 +313,11 @@ export function PersonalDashboard({ userId }: Props) {
         </TabsContent>
 
         <TabsContent value="analytics">
-          <div className="space-y-6">
+          <div className="space-y-5">
             <SpendingChart data={chartData ?? []} />
-            <CategoryBreakdown categoryTotals={categoryTotals} total={totalThisMonth} />
+            <CategoryBreakdown categoryTotals={categoryTotals} total={totalExpenses} />
+            <BudgetTracker userId={userId} categoryTotals={categoryTotals} month={selectedMonth} />
           </div>
-        </TabsContent>
-
-        <TabsContent value="budget">
-          <BudgetTracker userId={userId} categoryTotals={categoryTotals} month={selectedMonth} />
         </TabsContent>
       </Tabs>
 
@@ -359,7 +325,7 @@ export function PersonalDashboard({ userId }: Props) {
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
         <DialogContent className="glass-strong border-white/10 text-foreground max-w-md">
           <DialogHeader>
-            <DialogTitle>Add Personal Expense</DialogTitle>
+            <DialogTitle>Add Expense</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 mt-2">
             <div className="grid grid-cols-2 gap-3">
@@ -415,9 +381,7 @@ export function PersonalDashboard({ userId }: Props) {
                     className={cn(
                       'flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl border text-sm transition-all',
                       selectedPaidFrom === source
-                        ? source === 'income'
-                          ? 'border-emerald-400 bg-emerald-400/10 text-emerald-400'
-                          : 'border-indigo-400 bg-indigo-400/10 text-indigo-400'
+                        ? source === 'income' ? 'border-emerald-400 bg-emerald-400/10 text-emerald-400' : 'border-indigo-400 bg-indigo-400/10 text-indigo-400'
                         : 'border-white/10 bg-white/5 text-muted-foreground hover:bg-white/10'
                     )}
                   >
@@ -428,9 +392,7 @@ export function PersonalDashboard({ userId }: Props) {
             </div>
 
             <div className="flex gap-3">
-              <Button type="button" variant="ghost" className="flex-1" onClick={() => setAddOpen(false)}>
-                Cancel
-              </Button>
+              <Button type="button" variant="ghost" className="flex-1" onClick={() => setAddOpen(false)}>Cancel</Button>
               <Button type="submit" className="flex-1 gradient-teal text-[#0a0f1e] font-semibold" disabled={isSubmitting}>
                 {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Add Expense'}
               </Button>
