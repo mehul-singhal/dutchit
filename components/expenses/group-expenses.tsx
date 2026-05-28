@@ -12,13 +12,13 @@ import { createClient } from '@/lib/supabase/client'
 import { formatINR, formatDate, getInitials } from '@/lib/utils/formatters'
 import { AddExpenseSheet } from '@/components/expenses/add-expense-sheet'
 import { EXPENSE_CATEGORY_META } from '@/components/expenses/expense-category-meta'
-import type { Expense, MemberRole, UserProfile, ExpenseCategory } from '@/types/database'
+import type { Expense, MemberRole, UserProfile, ExpenseCategory, SplitType } from '@/types/database'
 
 type ExpenseSplitWithUser = {
   id: string
   expense_id: string
   user_id: string
-  split_type: import('@/types/database').SplitType
+  split_type: SplitType
   amount: number
   percentage: number | null
   shares: number | null
@@ -39,6 +39,7 @@ interface Props {
 
 export function GroupExpenses({ groupId, userId, userRole }: Props) {
   const [addOpen, setAddOpen] = useState(false)
+  const [editingExpense, setEditingExpense] = useState<ExpenseWithDetails | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const supabase = createClient()
   const queryClient = useQueryClient()
@@ -212,6 +213,17 @@ export function GroupExpenses({ groupId, userId, userRole }: Props) {
                               <Button
                                 variant="ghost"
                                 size="sm"
+                                className="text-muted-foreground hover:text-foreground hover:bg-white/10 gap-1 h-7"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  setEditingExpense(expense)
+                                }}
+                              >
+                                <Edit2 className="w-3.5 h-3.5" /> Edit
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
                                 className="text-rose-400 hover:text-rose-300 hover:bg-rose-400/10 gap-1 h-7"
                                 onClick={(e) => {
                                   e.stopPropagation()
@@ -246,6 +258,36 @@ export function GroupExpenses({ groupId, userId, userRole }: Props) {
           setAddOpen(false)
         }}
       />
+
+      {editingExpense && (
+        <AddExpenseSheet
+          open={!!editingExpense}
+          onOpenChange={(open) => { if (!open) setEditingExpense(null) }}
+          groupId={groupId}
+          userId={userId}
+          expense={{
+            id: editingExpense.id,
+            title: editingExpense.title,
+            amount: editingExpense.amount,
+            category: editingExpense.category,
+            date: editingExpense.date,
+            paid_by: editingExpense.paid_by,
+            notes: editingExpense.notes ?? null,
+            receipt_url: editingExpense.receipt_url ?? null,
+            expense_splits: editingExpense.expense_splits.map((s) => ({
+              user_id: s.user_id,
+              amount: s.amount,
+              split_type: s.split_type,
+            })),
+          }}
+          onSuccess={() => {
+            queryClient.invalidateQueries({ queryKey: ['expenses', groupId] })
+            queryClient.invalidateQueries({ queryKey: ['group-balances', groupId] })
+            queryClient.invalidateQueries({ queryKey: ['group-analytics', groupId] })
+            setEditingExpense(null)
+          }}
+        />
+      )}
     </div>
   )
 }

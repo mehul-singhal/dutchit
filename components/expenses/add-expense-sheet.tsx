@@ -1,10 +1,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useForm, Controller } from 'react-hook-form'
+import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { motion, AnimatePresence } from 'framer-motion'
 import { Loader2, Camera, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
@@ -45,15 +44,29 @@ const schema = z.object({
 
 type FormData = z.infer<typeof schema>
 
+interface ExpenseToEdit {
+  id: string
+  title: string
+  amount: number
+  category: ExpenseCategory
+  date: string
+  paid_by: string
+  notes: string | null
+  receipt_url: string | null
+  expense_splits: Array<{ user_id: string; amount: number; split_type: SplitType }>
+}
+
 interface Props {
   open: boolean
   onOpenChange: (open: boolean) => void
   groupId: string
   userId: string
+  expense?: ExpenseToEdit
   onSuccess: () => void
 }
 
-export function AddExpenseSheet({ open, onOpenChange, groupId, userId, onSuccess }: Props) {
+export function AddExpenseSheet({ open, onOpenChange, groupId, userId, expense, onSuccess }: Props) {
+  const isEditing = !!expense
   const [splitType, setSplitType] = useState<SplitType>('equal')
   const [members, setMembers] = useState<UserProfile[]>([])
   const [splitData, setSplitData] = useState<Record<string, number | boolean>>({})
@@ -61,7 +74,7 @@ export function AddExpenseSheet({ open, onOpenChange, groupId, userId, onSuccess
   const [receiptUrl, setReceiptUrl] = useState('')
   const supabase = createClient()
 
-  const { register, handleSubmit, watch, reset, control, setValue, formState: { errors, isSubmitting } } =
+  const { register, handleSubmit, watch, reset, setValue, formState: { errors, isSubmitting } } =
     useForm<FormData>({
       resolver: zodResolver(schema),
       defaultValues: {
@@ -73,7 +86,7 @@ export function AddExpenseSheet({ open, onOpenChange, groupId, userId, onSuccess
 
   const amount = parseFloat(watch('amount') || '0')
 
-  // Load members
+  // Load members, then pre-fill if editing
   useEffect(() => {
     if (!open) return
     supabase
@@ -84,16 +97,53 @@ export function AddExpenseSheet({ open, onOpenChange, groupId, userId, onSuccess
         const data = raw as Array<{ users: UserProfile | null }> | null
         const users = (data ?? []).map((m) => m.users as UserProfile).filter(Boolean)
         setMembers(users)
-        // Init equal split — all included
-        const init: Record<string, boolean> = {}
-        users.forEach((u) => (init[u.id] = true))
-        setSplitData(init)
-      })
-  }, [open, groupId, supabase])
 
-  // Reset split data when split type changes
+        if (expense) {
+          // Pre-fill form fields
+          setValue('title', expense.title)
+          setValue('amount', String(expense.amount))
+          setValue('category', expense.category)
+          setValue('date', expense.date)
+          setValue('paid_by', expense.paid_by)
+          setValue('notes', expense.notes ?? '')
+          setReceiptUrl(expense.receipt_url ?? '')
+
+          // Detect split type from first split
+          const detectedType = expense.expense_splits[0]?.split_type ?? 'equal'
+          setSplitType(detectedType)
+
+          // Pre-fill split data
+          if (detectedType === 'equal') {
+            const d: Record<string, boolean> = {}
+            users.forEach((u) => (d[u.id] = expense.expense_splits.some((s) => s.user_id === u.id)))
+            setSplitData(d)
+          } else {
+            const d: Record<string, number> = {}
+            users.forEach((u) => {
+              const s = expense.expense_splits.find((sp) => sp.user_id === u.id)
+              d[u.id] = s?.amount ?? 0
+            })
+            setSplitData(d)
+          }
+        } else {
+          // New expense defaults
+          reset({
+            category: 'other',
+            date: format(new Date(), 'yyyy-MM-dd'),
+            paid_by: userId,
+          })
+          setSplitType('equal')
+          const init: Record<string, boolean> = {}
+          users.forEach((u) => (init[u.id] = true))
+          setSplitData(init)
+          setReceiptUrl('')
+        }
+      })
+  }, [open, groupId, expense])
+
+  // Reset split data when split type changes (only for new expenses)
   useEffect(() => {
-    if (!members.length) return
+    if (!members.length || isEditing) return
     if (splitType === 'equal') {
       const d: Record<string, boolean> = {}
       members.forEach((u) => (d[u.id] = true))
@@ -162,52 +212,93 @@ export function AddExpenseSheet({ open, onOpenChange, groupId, userId, onSuccess
       return
     }
 
-    // Insert expense
-    const { data: expense, error } = await supabase
-      .from('expenses')
-      .insert({
-        group_id: groupId,
-        title: data.title,
-        amount: parseFloat(data.amount),
-        category: data.category,
-        date: data.date,
-        paid_by: data.paid_by,
-        notes: data.notes || null,
-        receipt_url: receiptUrl || null,
-        created_by: userId,
-      })
-      .select()
-      .single()
+    if (isEditing && expense) {
+      // Update expense
+      const { error } = await supabase
+        .from('expenses')
+        .update({
+          title: data.title,
+          amount: parseFloat(data.amount),
+          category: data.category,
+          date: data.date,
+          paid_by: data.paid_by,
+          notes: data.notes || null,
+          receipt_url: receiptUrl || null,
+        })
+        .eq('id', expense.id)
 
-    if (error) {
-      toast.error('Failed to add expense')
-      return
+      if (error) {
+        toast.error('Failed to update expense')
+        return
+      }
+
+      // Replace splits: delete old, insert new
+      await supabase.from('expense_splits').delete().eq('expense_id', expense.id)
+      const { error: splitsError } = await supabase.from('expense_splits').insert(
+        splits.map((s) => ({
+          expense_id: expense.id,
+          user_id: s.userId,
+          split_type: s.splitType,
+          amount: s.amount,
+          percentage: s.percentage ?? null,
+          shares: s.shares ?? null,
+          adjusted_amount: s.adjustedAmount ?? null,
+        }))
+      )
+
+      if (splitsError) {
+        toast.error('Expense updated but failed to save splits')
+        return
+      }
+
+      toast.success(`"${data.title}" updated!`)
+    } else {
+      // Insert new expense
+      const { data: newExpense, error } = await supabase
+        .from('expenses')
+        .insert({
+          group_id: groupId,
+          title: data.title,
+          amount: parseFloat(data.amount),
+          category: data.category,
+          date: data.date,
+          paid_by: data.paid_by,
+          notes: data.notes || null,
+          receipt_url: receiptUrl || null,
+          created_by: userId,
+        })
+        .select()
+        .single()
+
+      if (error) {
+        toast.error('Failed to add expense')
+        return
+      }
+
+      const { error: splitsError } = await supabase.from('expense_splits').insert(
+        splits.map((s) => ({
+          expense_id: newExpense.id,
+          user_id: s.userId,
+          split_type: s.splitType,
+          amount: s.amount,
+          percentage: s.percentage ?? null,
+          shares: s.shares ?? null,
+          adjusted_amount: s.adjustedAmount ?? null,
+        }))
+      )
+
+      if (splitsError) {
+        await supabase.from('expenses').delete().eq('id', newExpense.id)
+        toast.error('Failed to save splits')
+        return
+      }
+
+      toast.success(`"${data.title}" added! 🎉`)
+      reset()
+      setReceiptUrl('')
+      setSplitType('equal')
     }
 
-    // Insert splits
-    const { error: splitsError } = await supabase.from('expense_splits').insert(
-      splits.map((s) => ({
-        expense_id: expense.id,
-        user_id: s.userId,
-        split_type: s.splitType,
-        amount: s.amount,
-        percentage: s.percentage ?? null,
-        shares: s.shares ?? null,
-        adjusted_amount: s.adjustedAmount ?? null,
-      }))
-    )
-
-    if (splitsError) {
-      // Rollback expense
-      await supabase.from('expenses').delete().eq('id', expense.id)
-      toast.error('Failed to save splits')
-      return
-    }
-
-    toast.success(`"${data.title}" added! 🎉`)
-    reset()
-    setReceiptUrl('')
-    setSplitType('equal')
     onSuccess()
   }
 
@@ -219,12 +310,13 @@ export function AddExpenseSheet({ open, onOpenChange, groupId, userId, onSuccess
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="glass-strong border-white/10 text-foreground w-full max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader className="mb-2">
-          <DialogTitle className="text-xl font-bold">Add Expense</DialogTitle>
-          <p className="text-sm text-muted-foreground">Who&apos;s footing the bill?</p>
+          <DialogTitle className="text-xl font-bold">{isEditing ? 'Edit Expense' : 'Add Expense'}</DialogTitle>
+          <p className="text-sm text-muted-foreground">
+            {isEditing ? 'Update the details below.' : "Who's footing the bill?"}
+          </p>
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
-          {/* Title + Amount */}
           <div className="space-y-1.5">
             <Label>What was it for?</Label>
             <Input
@@ -250,7 +342,6 @@ export function AddExpenseSheet({ open, onOpenChange, groupId, userId, onSuccess
             {errors.amount && <p className="text-destructive text-xs">{errors.amount.message}</p>}
           </div>
 
-          {/* Category */}
           <div className="space-y-2">
             <Label>Category</Label>
             <div className="grid grid-cols-4 gap-1.5">
@@ -273,13 +364,11 @@ export function AddExpenseSheet({ open, onOpenChange, groupId, userId, onSuccess
             </div>
           </div>
 
-          {/* Date */}
           <div className="space-y-1.5">
             <Label>Date</Label>
             <Input type="date" className="bg-white/5 border-white/10 h-11" {...register('date')} />
           </div>
 
-          {/* Paid by */}
           <div className="space-y-2">
             <Label>Paid by</Label>
             <div className="flex flex-wrap gap-2">
@@ -307,13 +396,11 @@ export function AddExpenseSheet({ open, onOpenChange, groupId, userId, onSuccess
             </div>
           </div>
 
-          {/* Split type */}
           <div className="space-y-2">
             <Label>Split type</Label>
             <SplitTypeSelector value={splitType} onChange={setSplitType} />
           </div>
 
-          {/* Split inputs */}
           {amount > 0 && (
             <SplitInputs
               splitType={splitType}
@@ -325,7 +412,6 @@ export function AddExpenseSheet({ open, onOpenChange, groupId, userId, onSuccess
             />
           )}
 
-          {/* Notes */}
           <div className="space-y-1.5">
             <Label>Notes <span className="text-muted-foreground text-xs">(optional)</span></Label>
             <Textarea
@@ -336,7 +422,6 @@ export function AddExpenseSheet({ open, onOpenChange, groupId, userId, onSuccess
             />
           </div>
 
-          {/* Receipt */}
           <div className="space-y-1.5">
             <Label>Receipt <span className="text-muted-foreground text-xs">(optional)</span></Label>
             {receiptUrl ? (
@@ -362,16 +447,15 @@ export function AddExpenseSheet({ open, onOpenChange, groupId, userId, onSuccess
             )}
           </div>
 
-          {/* Submit */}
           <Button
             type="submit"
             className="w-full h-11 gradient-teal text-[#0a0f1e] font-semibold"
             disabled={isSubmitting}
           >
             {isSubmitting ? (
-              <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Adding...</>
+              <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> {isEditing ? 'Saving...' : 'Adding...'}</>
             ) : (
-              'Add Expense'
+              isEditing ? 'Save Changes' : 'Add Expense'
             )}
           </Button>
         </form>
