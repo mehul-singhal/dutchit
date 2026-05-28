@@ -25,7 +25,7 @@ export function DutchItLogo({ size = 'md', href, className }: DutchItLogoProps) 
           sizes.icon
         )}
       >
-        <span className="font-black tracking-tighter leading-none">D!</span>
+        <span className="font-bold leading-none text-[#0a0f1e]">÷</span>
       </div>
       <span className={cn('font-black tracking-tight text-gradient', sizes.text)}>
         DutchIt
