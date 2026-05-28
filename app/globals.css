@@ -55,8 +55,9 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-/* DutchIt "Liquid Dark" theme — always dark */
-:root {
+/* DutchIt dark theme */
+:root,
+html.dark {
   --background: #0a0f1e;
   --foreground: #f8fafc;
   --card: rgba(17, 24, 39, 0.8);
@@ -92,11 +93,47 @@
   --sidebar-accent-foreground: #00d4aa;
   --sidebar-border: rgba(255, 255, 255, 0.06);
   --sidebar-ring: #00d4aa;
+  color-scheme: dark;
 }
 
-/* Force dark mode always */
-html {
-  color-scheme: dark;
+/* DutchIt light theme */
+html.light {
+  --background: #f0f4f8;
+  --foreground: #0f172a;
+  --card: rgba(255, 255, 255, 0.85);
+  --card-foreground: #0f172a;
+  --popover: #ffffff;
+  --popover-foreground: #0f172a;
+  --primary: #00a88a;
+  --primary-foreground: #ffffff;
+  --secondary: #4f46e5;
+  --secondary-foreground: #ffffff;
+  --muted: rgba(0, 0, 0, 0.05);
+  --muted-foreground: #64748b;
+  --accent: rgba(0, 168, 138, 0.1);
+  --accent-foreground: #00a88a;
+  --destructive: #e11d48;
+  --border: rgba(0, 0, 0, 0.08);
+  --input: rgba(0, 0, 0, 0.06);
+  --ring: #00a88a;
+  --teal: #00a88a;
+  --teal-foreground: #ffffff;
+  --indigo: #4f46e5;
+  --chart-1: #00a88a;
+  --chart-2: #4f46e5;
+  --chart-3: #e11d48;
+  --chart-4: #d97706;
+  --chart-5: #059669;
+  --radius: 0.75rem;
+  --sidebar: rgba(255, 255, 255, 0.95);
+  --sidebar-foreground: #0f172a;
+  --sidebar-primary: #00a88a;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: rgba(0, 168, 138, 0.08);
+  --sidebar-accent-foreground: #00a88a;
+  --sidebar-border: rgba(0, 0, 0, 0.06);
+  --sidebar-ring: #00a88a;
+  color-scheme: light;
 }
 
 @layer base {
@@ -106,8 +143,7 @@ html {
   body {
     @apply bg-background text-foreground;
     font-family: "DM Sans", sans-serif;
-    /* Subtle grain texture */
-    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.02'/%3E%3C/svg%3E");
   }
   html {
     @apply font-sans;
@@ -123,6 +159,10 @@ html {
     -webkit-backdrop-filter: blur(16px);
     border: 1px solid rgba(255, 255, 255, 0.08);
   }
+  html.light .glass {
+    background: rgba(255, 255, 255, 0.7);
+    border: 1px solid rgba(0, 0, 0, 0.07);
+  }
 
   .glass-strong {
     background: rgba(17, 24, 39, 0.85);
@@ -130,9 +170,16 @@ html {
     -webkit-backdrop-filter: blur(24px);
     border: 1px solid rgba(255, 255, 255, 0.1);
   }
+  html.light .glass-strong {
+    background: rgba(255, 255, 255, 0.92);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+  }
 
   .gradient-teal {
     background: linear-gradient(135deg, #00d4aa 0%, #00b894 100%);
+  }
+  html.light .gradient-teal {
+    background: linear-gradient(135deg, #00a88a 0%, #00916e 100%);
   }
 
   .gradient-dark {
@@ -153,13 +200,25 @@ html {
     -webkit-text-fill-color: transparent;
     background-clip: text;
   }
+  html.light .text-gradient {
+    background: linear-gradient(135deg, #00a88a 0%, #4f46e5 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
 
   .balance-positive {
     color: #00d4aa;
   }
+  html.light .balance-positive {
+    color: #00916e;
+  }
 
   .balance-negative {
     color: #f43f5e;
+  }
+  html.light .balance-negative {
+    color: #e11d48;
   }
 
   .scrollbar-hide {
@@ -183,6 +242,16 @@ html {
     rgba(255, 255, 255, 0.04) 25%,
     rgba(255, 255, 255, 0.08) 50%,
     rgba(255, 255, 255, 0.04) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+html.light .skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(0, 0, 0, 0.04) 25%,
+    rgba(0, 0, 0, 0.08) 50%,
+    rgba(0, 0, 0, 0.04) 75%
   );
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite;

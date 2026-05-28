@@ -4,6 +4,7 @@ import './globals.css'
 import { Toaster } from '@/components/ui/sonner'
 import { Providers } from '@/components/providers'
 import { ServiceWorkerRegistrar } from '@/components/service-worker-registrar'
+import { OfflineBanner } from '@/components/offline-banner'
 
 const dmSans = DM_Sans({
   variable: '--font-dm-sans',
@@ -54,9 +55,10 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" className={`${dmSans.variable} h-full antialiased dark`}>
+    <html lang="en" className={`${dmSans.variable} h-full antialiased dark`} suppressHydrationWarning>
       <body className="min-h-full flex flex-col">
         <Providers>{children}</Providers>
+        <OfflineBanner />
         <ServiceWorkerRegistrar />
         <Toaster
           position="top-right"

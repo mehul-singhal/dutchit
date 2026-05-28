@@ -20,6 +20,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { getInitials } from '@/lib/utils/formatters'
+import { ThemeToggle } from '@/components/layout/theme-toggle'
 import type { UserProfile } from '@/types/database'
 
 interface NavItem {
@@ -125,6 +126,8 @@ export function AppSidebar({ user }: Props) {
 
       {/* User section */}
       <div className="border-t border-white/8 p-3 space-y-1">
+        <ThemeToggle collapsed={collapsed} />
+
         <Link
           href="/profile"
           className="flex items-center gap-3 px-3 py-2 rounded-xl text-muted-foreground hover:bg-white/5 hover:text-foreground transition-colors"
