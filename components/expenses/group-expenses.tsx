@@ -249,9 +249,17 @@ export function GroupExpenses({ groupId, userId, userRole, groupBaseCurrency = '
                                 variant="ghost"
                                 size="sm"
                                 className="text-rose-400 hover:text-rose-300 hover:bg-rose-400/10 gap-1 h-7"
-                                onClick={(e) => {
+                                onClick={async (e) => {
                                   e.stopPropagation()
-                                  if (window.confirm('Delete this expense?')) {
+                                  const { count } = await supabase
+                                    .from('settlements')
+                                    .select('*', { count: 'exact', head: true })
+                                    .eq('group_id', groupId)
+                                    .eq('status', 'confirmed')
+                                  const warning = (count ?? 0) > 0
+                                    ? 'This group has confirmed settlements. Deleting this expense will change the balances and may make existing settlements incorrect.\n\nDelete anyway?'
+                                    : 'Delete this expense?'
+                                  if (window.confirm(warning)) {
                                     deleteExpense.mutate(expense.id)
                                   }
                                 }}
