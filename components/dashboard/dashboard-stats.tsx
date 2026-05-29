@@ -25,44 +25,39 @@ export function DashboardStats({ userId }: Props) {
 
       const groupIds = memberships?.map((m) => m.group_id) ?? []
 
-      // Get expenses where user is involved — fetch enough to compute INR-equivalent owed amounts
-      const { data: splitsRaw } = await supabase
-        .from('expense_splits')
-        .select('amount, expense_id, expenses(paid_by, inr_amount, amount, expense_splits(user_id, amount))')
-        .eq('user_id', userId)
+      // Get expenses where user is involved — join from expenses side to get all splits
+      const { data: expensesRaw } = await supabase
+        .from('expenses')
+        .select('id, paid_by, inr_amount, amount, expense_splits(user_id, amount)')
+        .in('group_id', groupIds)
 
-      const splits = splitsRaw as Array<{
+      const userExpenses = expensesRaw as Array<{
+        id: string
+        paid_by: string
+        inr_amount: number | null
         amount: number
-        expense_id: string
-        expenses: {
-          paid_by: string
-          inr_amount: number | null
-          amount: number
-          expense_splits: Array<{ user_id: string; amount: number }>
-        } | null
+        expense_splits: Array<{ user_id: string; amount: number }>
       }> | null
 
       let totalOwed = 0 // others owe you (in INR)
       let totalOwe = 0  // you owe others (in INR)
 
-      for (const split of splits ?? []) {
-        const expense = split.expenses
-        if (!expense) continue
-        // inr_amount is the total in the group's base currency (or INR if base=INR)
-        // We need everything in INR for the dashboard. For non-INR groups, inr_amount
-        // is actually the base-currency total (e.g. EUR). However, since we store splits
-        // proportionally, we can derive the INR-equivalent share via proportion.
+      for (const expense of userExpenses ?? []) {
+        const mySplit = expense.expense_splits.find((s) => s.user_id === userId)
+        if (!mySplit) continue // user not involved in this expense
+
+        // inr_amount = total in the group's base currency (= INR for INR groups,
+        // = EUR/USD/etc for non-INR groups, but it's the stored "base" total).
+        // Splits are also stored in that same base currency, so the proportion is correct.
+        // We treat inr_amount as the authoritative INR-equivalent total.
         const expenseTotal = expense.inr_amount ?? expense.amount
         const splitsTotal = expense.expense_splits.reduce((s, x) => s + x.amount, 0)
-        // Scale factor: convert a split amount (in base currency) → INR equivalent
         const scale = splitsTotal > 0 ? expenseTotal / splitsTotal : 1
-        const myShareInr = split.amount * scale
+        const myShareInr = mySplit.amount * scale
 
         if (expense.paid_by === userId) {
-          // You paid — others owe you the total minus your share
           totalOwed += expenseTotal - myShareInr
         } else {
-          // Someone else paid — you owe your share
           totalOwe += myShareInr
         }
       }
@@ -86,16 +81,16 @@ export function DashboardStats({ userId }: Props) {
       totalOwe = Math.max(0, totalOwe - totalPaidOut)
       totalOwed = Math.max(0, totalOwed - totalReceived)
 
-      // Total expenses this month
+      // Total expenses this month (in INR equivalent)
       const now = new Date()
       const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
       const { data: monthExpenses } = await supabase
         .from('expenses')
-        .select('amount')
+        .select('amount, inr_amount')
         .in('group_id', groupIds)
         .gte('created_at', firstOfMonth)
 
-      const monthTotal = monthExpenses?.reduce((s, e) => s + e.amount, 0) ?? 0
+      const monthTotal = monthExpenses?.reduce((s, e) => s + (e.inr_amount ?? e.amount), 0) ?? 0
 
       return {
         totalOwed: Math.round(totalOwed * 100) / 100,
