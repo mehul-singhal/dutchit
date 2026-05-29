@@ -25,16 +25,33 @@ export function getCurrency(code: string): Currency {
   return SUPPORTED_CURRENCIES.find((c) => c.code === code) ?? { code, symbol: code, name: code }
 }
 
+// Currencies supported by Frankfurter (others fall back to open.er-api.com)
+const FRANKFURTER_CURRENCIES = new Set([
+  'AUD','BRL','CAD','CHF','CNY','CZK','DKK','EUR','GBP','HKD','HUF',
+  'IDR','ILS','INR','ISK','JPY','KRW','MXN','MYR','NOK','NZD','PHP',
+  'PLN','RON','SEK','SGD','THB','TRY','USD','ZAR',
+])
+
 /**
  * Fetch how many units of `to` one unit of `from` is worth.
- * Defaults to INR as the target currency.
+ * Uses Frankfurter for supported currencies, falls back to open.er-api.com for others (e.g. AED).
  * Returns null on network failure — caller should handle gracefully.
  */
 export async function fetchExchangeRate(from: string, to: string = 'INR'): Promise<number | null> {
   if (from === to) return 1
   try {
+    if (FRANKFURTER_CURRENCIES.has(from) && FRANKFURTER_CURRENCIES.has(to)) {
+      const res = await fetch(
+        `https://api.frankfurter.dev/v1/latest?from=${from}&to=${to}`,
+        { cache: 'no-store' }
+      )
+      if (!res.ok) throw new Error('frankfurter failed')
+      const data = await res.json() as { rates: Record<string, number> }
+      return data.rates?.[to] ?? null
+    }
+    // Fallback: open.er-api.com supports 160+ currencies including AED
     const res = await fetch(
-      `https://api.frankfurter.dev/v1/latest?from=${from}&to=${to}`,
+      `https://open.er-api.com/v6/latest/${from}`,
       { cache: 'no-store' }
     )
     if (!res.ok) return null
