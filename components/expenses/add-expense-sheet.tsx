@@ -191,7 +191,7 @@ export function AddExpenseSheet({ open, onOpenChange, groupId, userId, groupBase
             paid_by: userId,
           })
           setSplitType('equal')
-          setCurrency(groupBaseCurrency)
+          setCurrency('INR')
           setExchangeRate(1)
           const init: Record<string, boolean> = {}
           users.forEach((u) => (init[u.id] = true))
@@ -371,7 +371,7 @@ export function AddExpenseSheet({ open, onOpenChange, groupId, userId, groupBase
       reset()
       setReceiptUrl('')
       setSplitType('equal')
-      setCurrency(groupBaseCurrency)
+      setCurrency('INR')
       setExchangeRate(1)
     }
 
