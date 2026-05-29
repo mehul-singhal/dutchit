@@ -536,6 +536,7 @@ export function AddExpenseSheet({ open, onOpenChange, groupId, userId, groupBase
               totalAmount={inrAmount}
               splitData={splitData}
               onChange={setSplitData}
+              baseCurrency={groupBaseCurrency}
             />
           )}
 

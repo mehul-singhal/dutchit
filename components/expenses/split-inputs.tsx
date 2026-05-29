@@ -2,7 +2,8 @@
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Input } from '@/components/ui/input'
-import { getInitials, formatINR } from '@/lib/utils/formatters'
+import { getInitials } from '@/lib/utils/formatters'
+import { formatCurrency, getCurrency } from '@/lib/utils/currency'
 import { calculateEqualSplits, calculateShareSplits, calculatePercentageSplits, calculateAdjustmentSplits } from '@/lib/utils/split-calculator'
 import type { SplitType, UserProfile } from '@/types/database'
 import { cn } from '@/lib/utils'
@@ -14,9 +15,11 @@ interface Props {
   totalAmount: number
   splitData: Record<string, number | boolean>
   onChange: (data: Record<string, number | boolean>) => void
+  baseCurrency?: string
 }
 
-export function SplitInputs({ splitType, members, currentUserId, totalAmount, splitData, onChange }: Props) {
+export function SplitInputs({ splitType, members, currentUserId, totalAmount, splitData, onChange, baseCurrency = 'INR' }: Props) {
+  const fmt = (n: number) => formatCurrency(n, baseCurrency)
   if (splitType === 'equal') {
     const included = members.filter((m) => !!splitData[m.id])
     const perPerson = included.length > 0 ? totalAmount / included.length : 0
@@ -44,7 +47,7 @@ export function SplitInputs({ splitType, members, currentUserId, totalAmount, sp
               </Avatar>
               <span className="flex-1 text-left">{member.id === currentUserId ? 'You' : member.full_name}</span>
               <span className={`text-sm font-medium ${isIncluded ? 'text-primary' : 'text-muted-foreground'}`}>
-                {isIncluded ? formatINR(perPerson) : '—'}
+                {isIncluded ? fmt(perPerson) : '—'}
               </span>
             </button>
           )
@@ -61,7 +64,7 @@ export function SplitInputs({ splitType, members, currentUserId, totalAmount, sp
         <div className="flex justify-between text-xs text-muted-foreground mb-1">
           <span>Enter exact amounts</span>
           <span className={Math.abs(remaining) < 0.01 ? 'text-emerald-400' : 'text-rose-400'}>
-            {Math.abs(remaining) < 0.01 ? '✓ Balanced' : `${remaining > 0 ? '+' : ''}${formatINR(remaining)} remaining`}
+            {Math.abs(remaining) < 0.01 ? '✓ Balanced' : `${remaining > 0 ? '+' : ''}${fmt(remaining)} remaining`}
           </span>
         </div>
         {members.map((member) => (
@@ -74,7 +77,7 @@ export function SplitInputs({ splitType, members, currentUserId, totalAmount, sp
             </Avatar>
             <span className="text-sm flex-1">{member.id === currentUserId ? 'You' : member.full_name}</span>
             <div className="relative w-28">
-              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">₹</span>
+              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">{getCurrency(baseCurrency).symbol}</span>
               <Input
                 type="number"
                 step="0.01"
@@ -113,7 +116,7 @@ export function SplitInputs({ splitType, members, currentUserId, totalAmount, sp
                 </AvatarFallback>
               </Avatar>
               <span className="text-sm flex-1">{member.id === currentUserId ? 'You' : member.full_name}</span>
-              <span className="text-xs text-muted-foreground w-16 text-right">{formatINR(amount)}</span>
+              <span className="text-xs text-muted-foreground w-16 text-right">{fmt(amount)}</span>
               <div className="relative w-20">
                 <Input
                   type="number"
@@ -150,7 +153,7 @@ export function SplitInputs({ splitType, members, currentUserId, totalAmount, sp
                 </AvatarFallback>
               </Avatar>
               <span className="text-sm flex-1">{member.id === currentUserId ? 'You' : member.full_name}</span>
-              <span className="text-xs text-muted-foreground w-16 text-right">{formatINR(amount)}</span>
+              <span className="text-xs text-muted-foreground w-16 text-right">{fmt(amount)}</span>
               <div className="flex items-center gap-1">
                 <button
                   type="button"
@@ -178,7 +181,7 @@ export function SplitInputs({ splitType, members, currentUserId, totalAmount, sp
     return (
       <div className="space-y-2">
         <p className="text-xs text-muted-foreground">
-          Base: {formatINR(baseAmount)} each + adjustments
+          Base: {fmt(baseAmount)} each + adjustments
         </p>
         {members.map((member) => {
           const adj = Number(splitData[member.id] ?? 0)
@@ -192,7 +195,7 @@ export function SplitInputs({ splitType, members, currentUserId, totalAmount, sp
                 </AvatarFallback>
               </Avatar>
               <span className="text-sm flex-1">{member.id === currentUserId ? 'You' : member.full_name}</span>
-              <span className="text-xs text-muted-foreground w-16 text-right">{formatINR(finalAmount)}</span>
+              <span className="text-xs text-muted-foreground w-16 text-right">{fmt(finalAmount)}</span>
               <div className="relative w-24">
                 <Input
                   type="number"
