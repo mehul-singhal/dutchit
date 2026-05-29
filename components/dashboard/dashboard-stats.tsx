@@ -25,31 +25,45 @@ export function DashboardStats({ userId }: Props) {
 
       const groupIds = memberships?.map((m) => m.group_id) ?? []
 
-      // Get expenses where user is involved
+      // Get expenses where user is involved — fetch enough to compute INR-equivalent owed amounts
       const { data: splitsRaw } = await supabase
         .from('expense_splits')
-        .select('amount, expense_id, expenses(paid_by, inr_amount, amount)')
+        .select('amount, expense_id, expenses(paid_by, inr_amount, amount, expense_splits(user_id, amount))')
         .eq('user_id', userId)
 
       const splits = splitsRaw as Array<{
         amount: number
         expense_id: string
-        expenses: { paid_by: string; inr_amount: number | null; amount: number } | null
+        expenses: {
+          paid_by: string
+          inr_amount: number | null
+          amount: number
+          expense_splits: Array<{ user_id: string; amount: number }>
+        } | null
       }> | null
 
-      let totalOwed = 0 // others owe you
-      let totalOwe = 0  // you owe others
+      let totalOwed = 0 // others owe you (in INR)
+      let totalOwe = 0  // you owe others (in INR)
 
       for (const split of splits ?? []) {
         const expense = split.expenses
         if (!expense) continue
+        // inr_amount is the total in the group's base currency (or INR if base=INR)
+        // We need everything in INR for the dashboard. For non-INR groups, inr_amount
+        // is actually the base-currency total (e.g. EUR). However, since we store splits
+        // proportionally, we can derive the INR-equivalent share via proportion.
         const expenseTotal = expense.inr_amount ?? expense.amount
+        const splitsTotal = expense.expense_splits.reduce((s, x) => s + x.amount, 0)
+        // Scale factor: convert a split amount (in base currency) → INR equivalent
+        const scale = splitsTotal > 0 ? expenseTotal / splitsTotal : 1
+        const myShareInr = split.amount * scale
+
         if (expense.paid_by === userId) {
-          // You paid — others owe you (your split back to yourself)
-          totalOwed += expenseTotal - split.amount
+          // You paid — others owe you the total minus your share
+          totalOwed += expenseTotal - myShareInr
         } else {
-          // Someone else paid — you owe them
-          totalOwe += split.amount
+          // Someone else paid — you owe your share
+          totalOwe += myShareInr
         }
       }
 

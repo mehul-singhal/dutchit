@@ -69,8 +69,8 @@ export function RecentActivity({ userId }: Props) {
           id: e.id,
           type: 'expense' as const,
           label: `${e.users?.full_name ?? 'Someone'} added "${e.title}"`,
-          amount: e.inr_amount ?? e.amount,
-          currency: 'INR',
+          amount: e.amount,
+          currency: e.currency,
           at: e.created_at,
         })),
         ...(settlements ?? []).map((s) => ({
