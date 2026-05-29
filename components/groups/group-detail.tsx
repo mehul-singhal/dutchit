@@ -15,6 +15,7 @@ import { GroupActivity } from '@/components/groups/group-activity'
 import { GroupSettingsDialog } from '@/components/groups/group-settings-dialog'
 import { GroupExportButton } from '@/components/groups/group-export-button'
 import { GroupAnalytics } from '@/components/groups/group-analytics'
+import { GroupBalanceSummary } from '@/components/groups/group-balance-summary'
 import type { Group, MemberRole } from '@/types/database'
 
 interface Props {
@@ -95,6 +96,14 @@ export function GroupDetail({ group: initialGroup, userId, userRole }: Props) {
           {copied ? <Check className="w-3.5 h-3.5 text-primary" /> : <Copy className="w-3.5 h-3.5" />}
         </button>
       </div>
+
+      {/* Balance summary — visible without going to Balances tab */}
+      <GroupBalanceSummary
+        groupId={group.id}
+        userId={userId}
+        baseCurrency={group.base_currency ?? 'INR'}
+        settlementCurrency={group.settlement_currency ?? 'INR'}
+      />
 
       {/* Tabs */}
       <Tabs defaultValue="expenses">

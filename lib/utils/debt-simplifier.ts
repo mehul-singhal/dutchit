@@ -100,5 +100,10 @@ export function calculateBalances(
     }
   }
 
+  // Round to avoid floating point accumulation (e.g. 0.009999... showing as +0.01)
+  for (const key of Object.keys(balances)) {
+    balances[key] = Math.round(balances[key] * 100) / 100
+  }
+
   return balances
 }

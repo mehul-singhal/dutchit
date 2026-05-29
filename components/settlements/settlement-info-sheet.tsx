@@ -73,6 +73,7 @@ export function SettlementInfoSheet({
       if (error) throw error
 
       queryClient.invalidateQueries({ queryKey: ['group-balances', groupId] })
+      queryClient.invalidateQueries({ queryKey: ['group-balance-summary', groupId] })
       queryClient.invalidateQueries({ queryKey: ['group-activity', groupId] })
       queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] })
 
