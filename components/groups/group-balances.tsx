@@ -15,21 +15,24 @@ import {
 import { createClient } from '@/lib/supabase/client'
 import { calculateBalances, simplifyDebts } from '@/lib/utils/debt-simplifier'
 import { getInitials } from '@/lib/utils/formatters'
-import { formatCurrency } from '@/lib/utils/currency'
+import { formatCurrency, getCurrency } from '@/lib/utils/currency'
 import { EXPENSE_CATEGORY_META } from '@/components/expenses/expense-category-meta'
 import { UpiPaymentSheet } from '@/components/settlements/upi-payment-sheet'
+import { SettlementInfoSheet } from '@/components/settlements/settlement-info-sheet'
 import type { UserProfile, DebtSimplification, ExpenseCategory } from '@/types/database'
 
 interface Props {
   groupId: string
   userId: string
   baseCurrency?: string
+  settlementCurrency?: string
 }
 
 const PIE_COLORS = ['#00d4aa', '#6366f1', '#f43f5e', '#f59e0b', '#10b981', '#3b82f6', '#a855f7']
 
-export function GroupBalances({ groupId, userId, baseCurrency = 'INR' }: Props) {
+export function GroupBalances({ groupId, userId, baseCurrency = 'INR', settlementCurrency = 'INR' }: Props) {
   const [payingDebt, setPayingDebt] = useState<DebtSimplification | null>(null)
+  const [settlingDebt, setSettlingDebt] = useState<DebtSimplification | null>(null)
   const supabase = createClient()
   const fmt = (n: number) => formatCurrency(n, baseCurrency)
 
@@ -243,9 +246,13 @@ export function GroupBalances({ groupId, userId, baseCurrency = 'INR' }: Props) 
                     </p>
                   </div>
                   {isMe && (
-                    baseCurrency === 'INR' ? (
+                    baseCurrency === 'INR' && settlementCurrency === 'INR' ? (
                       <Button size="sm" className="gradient-teal text-[#0a0f1e] font-semibold shrink-0" onClick={() => setPayingDebt(debt)}>
                         Pay Now
+                      </Button>
+                    ) : settlementCurrency !== baseCurrency && settlementCurrency === 'INR' ? (
+                      <Button size="sm" className="gradient-teal text-[#0a0f1e] font-semibold shrink-0" onClick={() => setSettlingDebt(debt)}>
+                        Settle in {getCurrency(settlementCurrency).symbol}
                       </Button>
                     ) : (
                       <span className="text-xs text-muted-foreground shrink-0">Settle manually</span>
@@ -359,6 +366,18 @@ export function GroupBalances({ groupId, userId, baseCurrency = 'INR' }: Props) 
           baseCurrency={baseCurrency}
           open={!!payingDebt}
           onOpenChange={(open) => !open && setPayingDebt(null)}
+        />
+      )}
+
+      {settlingDebt && (
+        <SettlementInfoSheet
+          debt={settlingDebt}
+          groupId={groupId}
+          baseCurrency={baseCurrency}
+          settlementCurrency={settlementCurrency}
+          open={!!settlingDebt}
+          onOpenChange={(open) => !open && setSettlingDebt(null)}
+          onSettled={() => setSettlingDebt(null)}
         />
       )}
     </div>

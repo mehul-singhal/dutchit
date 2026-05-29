@@ -120,7 +120,7 @@ export function GroupDetail({ group: initialGroup, userId, userRole }: Props) {
           <GroupExpenses groupId={group.id} userId={userId} userRole={userRole} groupBaseCurrency={group.base_currency ?? 'INR'} />
         </TabsContent>
         <TabsContent value="balances">
-          <GroupBalances groupId={group.id} userId={userId} baseCurrency={group.base_currency ?? 'INR'} />
+          <GroupBalances groupId={group.id} userId={userId} baseCurrency={group.base_currency ?? 'INR'} settlementCurrency={group.settlement_currency ?? 'INR'} />
         </TabsContent>
         <TabsContent value="analytics">
           <GroupAnalytics groupId={group.id} userId={userId} baseCurrency={group.base_currency ?? 'INR'} />

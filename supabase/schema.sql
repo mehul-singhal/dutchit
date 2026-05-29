@@ -31,6 +31,7 @@ create table if not exists public.groups (
   created_by uuid references public.users(id) on delete set null,
   invite_code text unique default encode(gen_random_bytes(6), 'hex') not null,
   base_currency text not null default 'INR',
+  settlement_currency text not null default 'INR',
   archived boolean default false not null,
   created_at timestamptz default now() not null
 );

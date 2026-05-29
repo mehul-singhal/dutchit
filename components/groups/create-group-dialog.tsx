@@ -26,6 +26,7 @@ const schema = z.object({
   category: z.enum(['trip', 'home', 'couple', 'friends', 'work', 'other'] as const),
   description: z.string().max(200, 'Too long').optional(),
   base_currency: z.string().min(1),
+  settlement_currency: z.string().min(1),
 })
 
 type FormData = z.infer<typeof schema>
@@ -39,17 +40,20 @@ interface Props {
 
 export function CreateGroupDialog({ open, onOpenChange, userId, onSuccess }: Props) {
   const [currencyOpen, setCurrencyOpen] = useState(false)
+  const [settlementCurrencyOpen, setSettlementCurrencyOpen] = useState(false)
   const supabase = createClient()
 
   const { register, handleSubmit, watch, setValue, reset, formState: { errors, isSubmitting } } =
     useForm<FormData>({
       resolver: zodResolver(schema),
-      defaultValues: { category: 'friends', base_currency: 'INR' },
+      defaultValues: { category: 'friends', base_currency: 'INR', settlement_currency: 'INR' },
     })
 
   const selectedCategory = watch('category')
   const baseCurrency = watch('base_currency')
+  const settlementCurrency = watch('settlement_currency')
   const baseCurrencyMeta = getCurrency(baseCurrency)
+  const settlementCurrencyMeta = getCurrency(settlementCurrency)
 
   async function onSubmit(data: FormData) {
     const { data: group, error } = await supabase
@@ -59,6 +63,7 @@ export function CreateGroupDialog({ open, onOpenChange, userId, onSuccess }: Pro
         category: data.category,
         description: data.description || null,
         base_currency: data.base_currency,
+        settlement_currency: data.settlement_currency,
         created_by: userId,
       })
       .select()
@@ -124,8 +129,8 @@ export function CreateGroupDialog({ open, onOpenChange, userId, onSuccess }: Pro
           </div>
 
           <div className="space-y-1.5">
-            <Label>Settlement currency</Label>
-            <p className="text-xs text-muted-foreground">All balances and settlements will be in this currency</p>
+            <Label>Trip currency</Label>
+            <p className="text-xs text-muted-foreground">The currency you spend in during the trip</p>
             <div className="relative">
               <button
                 type="button"
@@ -147,6 +152,42 @@ export function CreateGroupDialog({ open, onOpenChange, userId, onSuccess }: Pro
                       className={cn(
                         'w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left transition-colors',
                         baseCurrency === c.code ? 'bg-primary/15 text-primary' : 'hover:bg-white/5 text-foreground'
+                      )}
+                    >
+                      <span className="w-6 text-center font-medium">{c.symbol}</span>
+                      <span className="font-medium">{c.code}</span>
+                      <span className="text-muted-foreground text-xs truncate">{c.name}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Settlement currency</Label>
+            <p className="text-xs text-muted-foreground">The currency you'll use to settle up (usually your home currency)</p>
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setSettlementCurrencyOpen(!settlementCurrencyOpen)}
+                className="w-full flex items-center gap-2 h-10 px-3 rounded-xl border border-white/10 bg-white/5 hover:bg-white/8 transition-colors text-sm font-medium"
+              >
+                <span className="text-base">{settlementCurrencyMeta.symbol}</span>
+                <span>{settlementCurrency}</span>
+                <span className="text-muted-foreground font-normal text-xs flex-1 text-left">{settlementCurrencyMeta.name}</span>
+                <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />
+              </button>
+              {settlementCurrencyOpen && (
+                <div className="absolute top-11 left-0 z-50 glass-strong border border-white/10 rounded-xl overflow-hidden w-full shadow-xl max-h-52 overflow-y-auto">
+                  {SUPPORTED_CURRENCIES.map((c) => (
+                    <button
+                      key={c.code}
+                      type="button"
+                      onClick={() => { setValue('settlement_currency', c.code); setSettlementCurrencyOpen(false) }}
+                      className={cn(
+                        'w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left transition-colors',
+                        settlementCurrency === c.code ? 'bg-primary/15 text-primary' : 'hover:bg-white/5 text-foreground'
                       )}
                     >
                       <span className="w-6 text-center font-medium">{c.symbol}</span>
