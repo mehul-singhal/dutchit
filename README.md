@@ -200,8 +200,7 @@ Dutch It! uses **pure UPI deep links** — no payment gateway or merchant accoun
 3. Tap GPay / PhonePe / Paytm / BHIM → native app opens pre-filled
 4. Complete payment in the UPI app, copy the transaction reference
 5. Return to Dutch It!, confirm payment (optionally paste the UPI ref)
-6. Settlement is recorded as `pending_confirmation`
-7. Recipient confirms in their activity feed → balances update
+6. Settlement is recorded as `confirmed` and balances update immediately
 
 ---
 
@@ -247,15 +246,21 @@ CSS utility classes: `.glass`, `.glass-strong`, `.gradient-teal`, `.text-gradien
 
 ## 🗺️ Roadmap
 
+- [x] Multi-currency with live exchange rates (Frankfurter + open.er-api.com fallback for AED etc.)
+- [x] Settlement currency — groups can have a separate settlement currency from the trip currency; avg trip exchange rate suggested at payout
+- [x] Inline balance summary on group page — net balance card + personal debt rows visible without navigating to Balances tab
+- [x] Dashboard net balance — single card showing overall position across all groups (owed / owe / settled)
+- [x] Dashboard "My spend" — shows user's own share of expenses this month, not total group spend
+- [x] Expense permissions — paid_by user can edit/delete their own expenses (not just the creator)
 - [ ] Push notifications for new expenses and settlement confirmations
 - [ ] Full offline-first sync (PowerSync + local SQLite) — see `OFFLINE_SYNC_NOTES.md`
 - [ ] Settlement confirmation UX for the payee (in-app prompt)
 - [ ] WhatsApp / SMS notifications
 - [ ] Group invite deep link with OG preview
 - [ ] Recurring expenses (rent, subscriptions)
-- [ ] Multi-currency with live exchange rates
 - [ ] AI receipt scanning
 - [ ] React Native mobile app
+- [ ] Generalise home currency (currently hardcoded to INR for dashboard and personal finance)
 
 ---
 
