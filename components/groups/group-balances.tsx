@@ -81,8 +81,8 @@ export function GroupBalances({ groupId, userId, baseCurrency = 'INR', settlemen
       }))
       const balanceMap = calculateBalances(expenseData)
       for (const s of settlements ?? []) {
-        balanceMap[s.paid_by] = (balanceMap[s.paid_by] ?? 0) - s.amount
-        balanceMap[s.paid_to] = (balanceMap[s.paid_to] ?? 0) + s.amount
+        balanceMap[s.paid_by] = (balanceMap[s.paid_by] ?? 0) + s.amount
+        balanceMap[s.paid_to] = (balanceMap[s.paid_to] ?? 0) - s.amount
       }
 
       // Total group spend

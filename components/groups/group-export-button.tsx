@@ -140,8 +140,8 @@ export function GroupExportButton({ groupId, groupName }: Props) {
       const balanceMap = calculateBalances(expenseData)
       for (const s of settlements ?? []) {
         if (s.status === 'confirmed') {
-          balanceMap[s.paid_by] = (balanceMap[s.paid_by] ?? 0) - s.amount
-          balanceMap[s.paid_to] = (balanceMap[s.paid_to] ?? 0) + s.amount
+          balanceMap[s.paid_by] = (balanceMap[s.paid_by] ?? 0) + s.amount
+          balanceMap[s.paid_to] = (balanceMap[s.paid_to] ?? 0) - s.amount
         }
       }
 
