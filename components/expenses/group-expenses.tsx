@@ -230,7 +230,7 @@ export function GroupExpenses({ groupId, userId, userRole, groupBaseCurrency = '
                           )}
 
                           {/* Actions */}
-                          {(expense.created_by === userId || userRole === 'admin') && (
+                          {(expense.created_by === userId || expense.paid_by === userId || userRole === 'admin') && (
                             <div className="flex gap-2 pt-1">
                               <Button
                                 variant="ghost"
