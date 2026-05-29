@@ -86,6 +86,7 @@ export function AddExpenseSheet({ open, onOpenChange, groupId, userId, groupBase
   const [receiptUrl, setReceiptUrl] = useState('')
   const [currency, setCurrency] = useState(groupBaseCurrency)
   const [exchangeRate, setExchangeRate] = useState(1)
+  const [inrRate, setInrRate] = useState(1) // currency → INR, for true_inr_amount
   const [fetchingRate, setFetchingRate] = useState(false)
   const [currencyOpen, setCurrencyOpen] = useState(false)
   const splitTypeInitRef = useRef(true)
@@ -108,18 +109,29 @@ export function AddExpenseSheet({ open, onOpenChange, groupId, userId, groupBase
   useEffect(() => {
     if (currency === groupBaseCurrency) {
       setExchangeRate(1)
+      // If base currency is INR, inrRate is also 1; otherwise fetch currency→INR
+      if (groupBaseCurrency === 'INR') {
+        setInrRate(1)
+      } else {
+        fetchExchangeRate(currency, 'INR').then((rate) => setInrRate(rate ?? 1))
+      }
       return
     }
     setFetchingRate(true)
-    fetchExchangeRate(currency, groupBaseCurrency)
-      .then((rate) => {
-        if (rate) {
-          setExchangeRate(rate)
+    Promise.all([
+      fetchExchangeRate(currency, groupBaseCurrency),
+      groupBaseCurrency === 'INR' ? Promise.resolve(null) : fetchExchangeRate(currency, 'INR'),
+    ])
+      .then(([baseRate, inrRateFetched]) => {
+        if (baseRate) {
+          setExchangeRate(baseRate)
         } else {
           toast.error('Could not fetch exchange rate — please try again')
           setCurrency(groupBaseCurrency)
           setExchangeRate(1)
         }
+        // inrRateFetched is null when groupBaseCurrency===INR (baseRate IS the INR rate)
+        setInrRate(inrRateFetched ?? baseRate ?? 1)
       })
       .finally(() => setFetchingRate(false))
   }, [currency, groupBaseCurrency])
@@ -294,11 +306,14 @@ export function AddExpenseSheet({ open, onOpenChange, groupId, userId, groupBase
       }
     }
 
+    const trueInrAmount = Math.round(parseFloat(data.amount) * inrRate * 100) / 100
+
     const expensePayload = {
       title: data.title,
       amount: parseFloat(data.amount),
       currency,
       inr_amount: Math.round(inrAmount * 100) / 100,
+      true_inr_amount: trueInrAmount,
       exchange_rate: exchangeRate,
       category: data.category,
       date: data.date,

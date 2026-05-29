@@ -28,12 +28,13 @@ export function DashboardStats({ userId }: Props) {
       // Get expenses where user is involved — join from expenses side to get all splits
       const { data: expensesRaw } = await supabase
         .from('expenses')
-        .select('id, paid_by, inr_amount, amount, expense_splits(user_id, amount)')
+        .select('id, paid_by, true_inr_amount, inr_amount, amount, expense_splits(user_id, amount)')
         .in('group_id', groupIds)
 
       const userExpenses = expensesRaw as Array<{
         id: string
         paid_by: string
+        true_inr_amount: number | null
         inr_amount: number | null
         amount: number
         expense_splits: Array<{ user_id: string; amount: number }>
@@ -46,17 +47,16 @@ export function DashboardStats({ userId }: Props) {
         const mySplit = expense.expense_splits.find((s) => s.user_id === userId)
         if (!mySplit) continue // user not involved in this expense
 
-        // inr_amount = total in the group's base currency (= INR for INR groups,
-        // = EUR/USD/etc for non-INR groups, but it's the stored "base" total).
-        // Splits are also stored in that same base currency, so the proportion is correct.
-        // We treat inr_amount as the authoritative INR-equivalent total.
-        const expenseTotal = expense.inr_amount ?? expense.amount
+        // true_inr_amount = original currency converted to INR (e.g. $1888 → ₹157k)
+        // Falls back to inr_amount (= group base currency total) for old rows without true_inr_amount
+        const expenseTotalInr = expense.true_inr_amount ?? expense.inr_amount ?? expense.amount
         const splitsTotal = expense.expense_splits.reduce((s, x) => s + x.amount, 0)
-        const scale = splitsTotal > 0 ? expenseTotal / splitsTotal : 1
+        // Derive each person's INR share proportionally from the true INR total
+        const scale = splitsTotal > 0 ? expenseTotalInr / splitsTotal : 1
         const myShareInr = mySplit.amount * scale
 
         if (expense.paid_by === userId) {
-          totalOwed += expenseTotal - myShareInr
+          totalOwed += expenseTotalInr - myShareInr
         } else {
           totalOwe += myShareInr
         }
@@ -86,11 +86,11 @@ export function DashboardStats({ userId }: Props) {
       const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
       const { data: monthExpenses } = await supabase
         .from('expenses')
-        .select('amount, inr_amount')
+        .select('amount, inr_amount, true_inr_amount')
         .in('group_id', groupIds)
         .gte('created_at', firstOfMonth)
 
-      const monthTotal = monthExpenses?.reduce((s, e) => s + (e.inr_amount ?? e.amount), 0) ?? 0
+      const monthTotal = monthExpenses?.reduce((s, e) => s + (e.true_inr_amount ?? e.inr_amount ?? e.amount), 0) ?? 0
 
       return {
         totalOwed: Math.round(totalOwed * 100) / 100,

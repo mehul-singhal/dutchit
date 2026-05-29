@@ -104,6 +104,7 @@ export interface Database {
           amount: number
           currency: string
           inr_amount: number | null
+          true_inr_amount: number | null
           exchange_rate: number | null
           paid_by: string
           category: ExpenseCategory
@@ -121,6 +122,7 @@ export interface Database {
           amount: number
           currency?: string
           inr_amount?: number | null
+          true_inr_amount?: number | null
           exchange_rate?: number | null
           paid_by: string
           category: ExpenseCategory
@@ -138,6 +140,7 @@ export interface Database {
           amount?: number
           currency?: string
           inr_amount?: number | null
+          true_inr_amount?: number | null
           exchange_rate?: number | null
           paid_by?: string
           category?: ExpenseCategory

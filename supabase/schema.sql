@@ -61,6 +61,7 @@ create table if not exists public.expenses (
   amount numeric(10, 2) not null check (amount > 0),
   currency text default 'INR' not null,
   inr_amount numeric(10, 2) default null,
+  true_inr_amount numeric(12, 2) default null,
   exchange_rate numeric(12, 6) default null,
   paid_by uuid references public.users(id) on delete set null not null,
   category expense_category default 'other' not null,
