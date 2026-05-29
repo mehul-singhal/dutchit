@@ -128,8 +128,8 @@ export function DashboardStats({ userId }: Props) {
   const net = stats?.net ?? 0
   const cards = [
     {
-      label: net >= 0 ? "You're owed" : 'You owe',
-      sublabel: net >= 0 ? 'Net across all groups' : 'Net across all groups',
+      label: net > 0 ? "You're owed" : net < 0 ? 'You owe' : 'All settled',
+      sublabel: 'Net across all groups',
       value: Math.abs(net),
       icon: net >= 0 ? TrendingUp : TrendingDown,
       color: net > 0 ? 'text-emerald-400' : net < 0 ? 'text-rose-400' : 'text-muted-foreground',
@@ -176,8 +176,8 @@ export function DashboardStats({ userId }: Props) {
             <div className={`text-xl font-bold ${card.color}`}>
               {card.isCurrency === false ? (
                 <CountUp to={card.value} />
-              ) : net === 0 && card.label !== 'My spend' ? (
-                <span className="text-sm font-semibold text-muted-foreground">Settled</span>
+              ) : net === 0 && i === 0 ? (
+                <span className="text-sm font-semibold text-muted-foreground">🎉 All clear</span>
               ) : (
                 <span>
                   {'prefix' in card && card.prefix}{getCurrency('INR').symbol}<CountUp to={card.value} decimals={0} />
