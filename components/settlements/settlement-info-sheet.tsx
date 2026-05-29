@@ -67,7 +67,7 @@ export function SettlementInfoSheet({
         group_id: groupId,
         paid_by: debt.from,
         paid_to: debt.to,
-        amount: suggestedAmount,
+        amount: debt.amount,  // always base currency — keeps balance math consistent
         status: 'confirmed',
       })
       if (error) throw error
