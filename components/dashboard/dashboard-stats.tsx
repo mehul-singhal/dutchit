@@ -40,6 +40,11 @@ export function DashboardStats({ userId }: Props) {
         expense_splits: Array<{ user_id: string; amount: number }>
       }> | null
 
+      console.log('[dashboard-stats] userId:', userId)
+      console.log('[dashboard-stats] groupIds:', groupIds)
+      console.log('[dashboard-stats] expenses fetched:', userExpenses?.length)
+      console.log('[dashboard-stats] expenses:', JSON.stringify(userExpenses, null, 2))
+
       let totalOwed = 0 // others owe you (in INR)
       let totalOwe = 0  // you owe others (in INR)
 
