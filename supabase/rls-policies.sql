@@ -148,20 +148,22 @@ create policy "Group members can create expenses"
     )
   );
 
-create policy "Expense creator or group admin can update expenses"
+create policy "Expense creator or paid_by or group admin can update expenses"
   on public.expenses for update
   using (
     created_by = auth.uid()
+    or paid_by = auth.uid()
     or group_id in (
       select group_id from public.group_members
       where user_id = auth.uid() and role = 'admin'
     )
   );
 
-create policy "Expense creator or group admin can delete expenses"
+create policy "Expense creator or paid_by or group admin can delete expenses"
   on public.expenses for delete
   using (
     created_by = auth.uid()
+    or paid_by = auth.uid()
     or group_id in (
       select group_id from public.group_members
       where user_id = auth.uid() and role = 'admin'
@@ -195,21 +197,21 @@ create policy "Group members can create expense splits"
     )
   );
 
-create policy "Expense creator can update splits"
+create policy "Expense creator or paid_by can update splits"
   on public.expense_splits for update
   using (
     expense_id in (
       select id from public.expenses
-      where created_by = auth.uid()
+      where created_by = auth.uid() or paid_by = auth.uid()
     )
   );
 
-create policy "Expense creator can delete splits"
+create policy "Expense creator or paid_by can delete splits"
   on public.expense_splits for delete
   using (
     expense_id in (
       select id from public.expenses
-      where created_by = auth.uid()
+      where created_by = auth.uid() or paid_by = auth.uid()
     )
   );
 
