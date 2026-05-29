@@ -30,7 +30,7 @@ import {
   calculateAdjustmentSplits,
 } from '@/lib/utils/split-calculator'
 import { getInitials, formatINR } from '@/lib/utils/formatters'
-import { SUPPORTED_CURRENCIES, fetchExchangeRate, getCurrency } from '@/lib/utils/currency'
+import { SUPPORTED_CURRENCIES, fetchExchangeRate, getCurrency, formatCurrency } from '@/lib/utils/currency'
 import type { SplitType, ExpenseCategory, UserProfile } from '@/types/database'
 import { cn } from '@/lib/utils'
 
@@ -72,11 +72,12 @@ interface Props {
   onOpenChange: (open: boolean) => void
   groupId: string
   userId: string
+  groupBaseCurrency?: string
   expense?: ExpenseToEdit
   onSuccess: () => void
 }
 
-export function AddExpenseSheet({ open, onOpenChange, groupId, userId, expense, onSuccess }: Props) {
+export function AddExpenseSheet({ open, onOpenChange, groupId, userId, groupBaseCurrency = 'INR', expense, onSuccess }: Props) {
   const isEditing = !!expense
   const [splitType, setSplitType] = useState<SplitType>('equal')
   const [members, setMembers] = useState<UserProfile[]>([])
@@ -103,25 +104,25 @@ export function AddExpenseSheet({ open, onOpenChange, groupId, userId, expense, 
   const amount = parseFloat(watch('amount') || '0')
   const inrAmount = amount * exchangeRate
 
-  // Fetch exchange rate when currency changes
+  // Fetch exchange rate when currency changes (converts to group base currency)
   useEffect(() => {
-    if (currency === 'INR') {
+    if (currency === groupBaseCurrency) {
       setExchangeRate(1)
       return
     }
     setFetchingRate(true)
-    fetchExchangeRate(currency)
+    fetchExchangeRate(currency, groupBaseCurrency)
       .then((rate) => {
         if (rate) {
           setExchangeRate(rate)
         } else {
           toast.error('Could not fetch exchange rate — please try again')
-          setCurrency('INR')
+          setCurrency(groupBaseCurrency)
           setExchangeRate(1)
         }
       })
       .finally(() => setFetchingRate(false))
-  }, [currency])
+  }, [currency, groupBaseCurrency])
 
   // Load members, then pre-fill if editing
   useEffect(() => {
@@ -144,7 +145,7 @@ export function AddExpenseSheet({ open, onOpenChange, groupId, userId, expense, 
           setValue('paid_by', expense.paid_by)
           setValue('notes', expense.notes ?? '')
           setReceiptUrl(expense.receipt_url ?? '')
-          setCurrency(expense.currency ?? 'INR')
+          setCurrency(expense.currency ?? groupBaseCurrency)
           setExchangeRate(expense.exchange_rate ?? 1)
 
           const detectedType = expense.expense_splits[0]?.split_type ?? 'equal'
@@ -190,7 +191,7 @@ export function AddExpenseSheet({ open, onOpenChange, groupId, userId, expense, 
             paid_by: userId,
           })
           setSplitType('equal')
-          setCurrency('INR')
+          setCurrency(groupBaseCurrency)
           setExchangeRate(1)
           const init: Record<string, boolean> = {}
           users.forEach((u) => (init[u.id] = true))
@@ -288,7 +289,7 @@ export function AddExpenseSheet({ open, onOpenChange, groupId, userId, expense, 
     if (splitType === 'exact') {
       const amountSum = members.reduce((s, m) => s + Number(splitData[m.id] ?? 0), 0)
       if (Math.abs(amountSum - inrAmount) > 0.5) {
-        toast.error(`Exact amounts must sum to ${formatINR(inrAmount)} (currently ${formatINR(amountSum)})`)
+        toast.error(`Exact amounts must sum to ${formatCurrency(inrAmount, groupBaseCurrency)} (currently ${formatCurrency(amountSum, groupBaseCurrency)})`)
         return
       }
     }
@@ -370,7 +371,7 @@ export function AddExpenseSheet({ open, onOpenChange, groupId, userId, expense, 
       reset()
       setReceiptUrl('')
       setSplitType('equal')
-      setCurrency('INR')
+      setCurrency(groupBaseCurrency)
       setExchangeRate(1)
     }
 
@@ -453,15 +454,15 @@ export function AddExpenseSheet({ open, onOpenChange, groupId, userId, expense, 
             </div>
             {errors.amount && <p className="text-destructive text-xs">{errors.amount.message}</p>}
 
-            {/* INR equivalent preview for non-INR currencies */}
-            {currency !== 'INR' && amount > 0 && (
+            {/* Base currency equivalent preview for non-base currencies */}
+            {currency !== groupBaseCurrency && amount > 0 && (
               <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
                 {fetchingRate ? (
                   <><Loader2 className="w-3 h-3 animate-spin" /> Fetching rate...</>
                 ) : (
                   <>
-                    <span className="text-primary font-medium">{formatINR(inrAmount)}</span>
-                    <span>· 1 {currency} = {formatINR(exchangeRate)}</span>
+                    <span className="text-primary font-medium">{formatCurrency(inrAmount, groupBaseCurrency)}</span>
+                    <span>· 1 {currency} = {formatCurrency(exchangeRate, groupBaseCurrency)}</span>
                   </>
                 )}
               </div>

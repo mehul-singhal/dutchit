@@ -37,9 +37,10 @@ interface Props {
   groupId: string
   userId: string
   userRole: MemberRole
+  groupBaseCurrency?: string
 }
 
-export function GroupExpenses({ groupId, userId, userRole }: Props) {
+export function GroupExpenses({ groupId, userId, userRole, groupBaseCurrency = 'INR' }: Props) {
   const [addOpen, setAddOpen] = useState(false)
   const [editingExpense, setEditingExpense] = useState<ExpenseWithDetails | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
@@ -274,6 +275,7 @@ export function GroupExpenses({ groupId, userId, userRole }: Props) {
         onOpenChange={setAddOpen}
         groupId={groupId}
         userId={userId}
+        groupBaseCurrency={groupBaseCurrency}
         onSuccess={() => {
           queryClient.invalidateQueries({ queryKey: ['expenses', groupId] })
           queryClient.invalidateQueries({ queryKey: ['group-balances', groupId] })
@@ -287,6 +289,7 @@ export function GroupExpenses({ groupId, userId, userRole }: Props) {
           onOpenChange={(open) => { if (!open) setEditingExpense(null) }}
           groupId={groupId}
           userId={userId}
+          groupBaseCurrency={groupBaseCurrency}
           expense={{
             id: editingExpense.id,
             title: editingExpense.title,

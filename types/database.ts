@@ -44,6 +44,7 @@ export interface Database {
           description: string | null
           created_by: string
           invite_code: string
+          base_currency: string
           archived: boolean
           created_at: string
         }
@@ -54,6 +55,7 @@ export interface Database {
           description?: string | null
           created_by: string
           invite_code?: string
+          base_currency?: string
           archived?: boolean
           created_at?: string
         }
@@ -64,6 +66,7 @@ export interface Database {
           description?: string | null
           created_by?: string
           invite_code?: string
+          base_currency?: string
           archived?: boolean
           created_at?: string
         }

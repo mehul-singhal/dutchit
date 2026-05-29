@@ -14,6 +14,7 @@ import confetti from 'canvas-confetti'
 import { CheckCircle, XCircle, Loader2, Copy, MessageSquare, ExternalLink } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { formatINR, getInitials } from '@/lib/utils/formatters'
+import { formatCurrency } from '@/lib/utils/currency'
 import { buildUpiDeepLink, buildUpiQrString, getUpiAppFromId } from '@/lib/utils/upi'
 import { UpiAppGrid } from '@/components/settlements/upi-app-grid'
 import { QrCodeDisplay } from '@/components/settlements/qr-code-display'
@@ -24,11 +25,12 @@ type Step = 'pay' | 'confirm' | 'done'
 interface Props {
   debt: DebtSimplification
   groupId: string
+  baseCurrency?: string
   open: boolean
   onOpenChange: (open: boolean) => void
 }
 
-export function UpiPaymentSheet({ debt, groupId, open, onOpenChange }: Props) {
+export function UpiPaymentSheet({ debt, groupId, baseCurrency = 'INR', open, onOpenChange }: Props) {
   const [step, setStep] = useState<Step>('pay')
   const [selectedApp, setSelectedApp] = useState<UpiApp | null>(null)
   const [upiRef, setUpiRef] = useState('')
@@ -124,7 +126,7 @@ export function UpiPaymentSheet({ debt, groupId, open, onOpenChange }: Props) {
         <div>
           <p className="text-xs text-muted-foreground">Paying</p>
           <p className="text-xl font-bold">{recipient?.full_name ?? 'Unknown'}</p>
-          <p className="text-3xl font-black text-primary mt-1">{formatINR(debt.amount)}</p>
+          <p className="text-3xl font-black text-primary mt-1">{formatCurrency(debt.amount, baseCurrency)}</p>
         </div>
       </div>
 

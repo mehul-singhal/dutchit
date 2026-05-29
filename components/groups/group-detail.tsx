@@ -117,10 +117,10 @@ export function GroupDetail({ group: initialGroup, userId, userRole }: Props) {
         </TabsList>
 
         <TabsContent value="expenses">
-          <GroupExpenses groupId={group.id} userId={userId} userRole={userRole} />
+          <GroupExpenses groupId={group.id} userId={userId} userRole={userRole} groupBaseCurrency={group.base_currency ?? 'INR'} />
         </TabsContent>
         <TabsContent value="balances">
-          <GroupBalances groupId={group.id} userId={userId} />
+          <GroupBalances groupId={group.id} userId={userId} baseCurrency={group.base_currency ?? 'INR'} />
         </TabsContent>
         <TabsContent value="analytics">
           <GroupAnalytics groupId={group.id} userId={userId} />
@@ -138,6 +138,7 @@ export function GroupDetail({ group: initialGroup, userId, userRole }: Props) {
           open={settingsOpen}
           onOpenChange={setSettingsOpen}
           group={group}
+          userRole={userRole}
           onUpdated={(updated) => setGroup((prev) => ({ ...prev, ...updated }))}
         />
       )}

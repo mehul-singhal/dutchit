@@ -15,6 +15,7 @@ import {
 import { createClient } from '@/lib/supabase/client'
 import { calculateBalances, simplifyDebts } from '@/lib/utils/debt-simplifier'
 import { formatINR, getInitials } from '@/lib/utils/formatters'
+import { formatCurrency } from '@/lib/utils/currency'
 import { EXPENSE_CATEGORY_META } from '@/components/expenses/expense-category-meta'
 import { UpiPaymentSheet } from '@/components/settlements/upi-payment-sheet'
 import type { UserProfile, DebtSimplification, ExpenseCategory } from '@/types/database'
@@ -22,13 +23,15 @@ import type { UserProfile, DebtSimplification, ExpenseCategory } from '@/types/d
 interface Props {
   groupId: string
   userId: string
+  baseCurrency?: string
 }
 
 const PIE_COLORS = ['#00d4aa', '#6366f1', '#f43f5e', '#f59e0b', '#10b981', '#3b82f6', '#a855f7']
 
-export function GroupBalances({ groupId, userId }: Props) {
+export function GroupBalances({ groupId, userId, baseCurrency = 'INR' }: Props) {
   const [payingDebt, setPayingDebt] = useState<DebtSimplification | null>(null)
   const supabase = createClient()
+  const fmt = (n: number) => formatCurrency(n, baseCurrency)
 
   const { data, isLoading } = useQuery({
     queryKey: ['group-balances', groupId],
@@ -143,8 +146,8 @@ export function GroupBalances({ groupId, userId }: Props) {
 
       {/* ── Summary stats ── */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        <StatCard label="Total spent" value={formatINR(totalSpend)} icon={<Receipt className="w-4 h-4" />} />
-        <StatCard label="You paid" value={formatINR(mySpend)} sub={`${myPct}% of total`} icon={<TrendingUp className="w-4 h-4" />} />
+        <StatCard label="Total spent" value={fmt(totalSpend)} icon={<Receipt className="w-4 h-4" />} />
+        <StatCard label="You paid" value={fmt(mySpend)} sub={`${myPct}% of total`} icon={<TrendingUp className="w-4 h-4" />} />
         <StatCard label="Members" value={String(members.length)} icon={<Users className="w-4 h-4" />} className="col-span-2 sm:col-span-1" />
       </div>
 
@@ -154,7 +157,7 @@ export function GroupBalances({ groupId, userId }: Props) {
         <div className="flex items-center gap-2">
           {myBalance > 0 ? <TrendingUp className="w-5 h-5 text-emerald-400" /> : myBalance < 0 ? <TrendingDown className="w-5 h-5 text-rose-400" /> : null}
           <span className={`text-3xl font-bold ${myBalance > 0 ? 'text-emerald-400' : myBalance < 0 ? 'text-rose-400' : 'text-muted-foreground'}`}>
-            {myBalance === 0 ? 'All settled up! 🎉' : `${myBalance > 0 ? '+' : ''}${formatINR(myBalance)}`}
+            {myBalance === 0 ? 'All settled up! 🎉' : `${myBalance > 0 ? '+' : ''}${fmt(myBalance)}`}
           </span>
         </div>
         {myBalance > 0 && <p className="text-xs text-muted-foreground mt-1">Others owe you this amount</p>}
@@ -192,11 +195,11 @@ export function GroupBalances({ groupId, userId }: Props) {
                       <p className="text-sm font-medium truncate">
                         {isMe ? 'You' : user.full_name ?? 'Unknown'}
                       </p>
-                      <p className="text-xs text-muted-foreground">paid {formatINR(paid)}</p>
+                      <p className="text-xs text-muted-foreground">paid {fmt(paid)}</p>
                     </div>
                     <div className="text-right shrink-0">
                       <p className={`text-sm font-bold ${balance > 0 ? 'text-emerald-400' : balance < 0 ? 'text-rose-400' : 'text-muted-foreground'}`}>
-                        {balance === 0 ? 'settled' : `${balance > 0 ? '+' : ''}${formatINR(balance)}`}
+                        {balance === 0 ? 'settled' : `${balance > 0 ? '+' : ''}${fmt(balance)}`}
                       </p>
                       <p className="text-[10px] text-muted-foreground">
                         {balance > 0 ? 'gets back' : balance < 0 ? 'owes' : ''}
@@ -236,13 +239,17 @@ export function GroupBalances({ groupId, userId }: Props) {
                       </span>
                     </div>
                     <p className={`text-lg font-bold mt-0.5 ${isMe ? 'text-rose-400' : 'text-emerald-400'}`}>
-                      {formatINR(debt.amount)}
+                      {fmt(debt.amount)}
                     </p>
                   </div>
                   {isMe && (
-                    <Button size="sm" className="gradient-teal text-[#0a0f1e] font-semibold shrink-0" onClick={() => setPayingDebt(debt)}>
-                      Pay Now
-                    </Button>
+                    baseCurrency === 'INR' ? (
+                      <Button size="sm" className="gradient-teal text-[#0a0f1e] font-semibold shrink-0" onClick={() => setPayingDebt(debt)}>
+                        Pay Now
+                      </Button>
+                    ) : (
+                      <span className="text-xs text-muted-foreground shrink-0">Settle manually</span>
+                    )
                   )}
                 </motion.div>
               )
@@ -273,7 +280,7 @@ export function GroupBalances({ groupId, userId }: Props) {
                 </Pie>
                 <ReTooltip
                   contentStyle={{ background: 'rgba(17,24,39,0.95)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', color: '#f8fafc', fontSize: '12px' }}
-                  formatter={(value) => [formatINR(value as number), '']}
+                  formatter={(value) => [fmt(value as number), '']}
                 />
               </PieChart>
             </ResponsiveContainer>
@@ -284,7 +291,7 @@ export function GroupBalances({ groupId, userId }: Props) {
                     <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: PIE_COLORS[i % PIE_COLORS.length] }} />
                     <span className="text-sm flex-1 truncate">{item.emoji} {item.name}</span>
                     <span className="text-xs text-muted-foreground">{item.pct}%</span>
-                    <span className="text-sm font-medium w-20 text-right">{formatINR(item.value)}</span>
+                    <span className="text-sm font-medium w-20 text-right">{fmt(item.value)}</span>
                   </div>
                   <Progress value={item.pct} className="h-1 bg-white/10" />
                 </div>
@@ -302,10 +309,10 @@ export function GroupBalances({ groupId, userId }: Props) {
             <BarChart data={monthlyData} margin={{ top: 5, right: 0, left: -20, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
               <XAxis dataKey="month" tick={{ fill: '#94a3b8', fontSize: 11 }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fill: '#94a3b8', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v) => `₹${v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v}`} />
+              <YAxis tick={{ fill: '#94a3b8', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v) => formatCurrency(v, baseCurrency).replace(/\.00$/, '')} />
               <ReTooltip
                 contentStyle={{ background: 'rgba(17,24,39,0.95)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', color: '#f8fafc', fontSize: '12px' }}
-                formatter={(value) => [formatINR(value as number), 'Spent']}
+                formatter={(value) => [fmt(value as number), 'Spent']}
               />
               <Bar dataKey="total" fill="#00d4aa" radius={[4, 4, 0, 0]} />
             </BarChart>
@@ -335,7 +342,7 @@ export function GroupBalances({ groupId, userId }: Props) {
                       </Avatar>
                       <span className="text-sm flex-1 truncate">{isMe ? 'You' : user.full_name ?? 'Unknown'}</span>
                       <span className="text-xs text-muted-foreground">{pct}%</span>
-                      <span className="text-sm font-medium w-20 text-right">{formatINR(paid)}</span>
+                      <span className="text-sm font-medium w-20 text-right">{fmt(paid)}</span>
                     </div>
                     <Progress value={pct} className="h-1.5 bg-white/10" />
                   </div>
@@ -349,6 +356,7 @@ export function GroupBalances({ groupId, userId }: Props) {
         <UpiPaymentSheet
           debt={payingDebt}
           groupId={groupId}
+          baseCurrency={baseCurrency}
           open={!!payingDebt}
           onOpenChange={(open) => !open && setPayingDebt(null)}
         />

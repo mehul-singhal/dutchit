@@ -26,19 +26,20 @@ export function getCurrency(code: string): Currency {
 }
 
 /**
- * Fetch how many INR one unit of `from` is worth.
+ * Fetch how many units of `to` one unit of `from` is worth.
+ * Defaults to INR as the target currency.
  * Returns null on network failure — caller should handle gracefully.
  */
-export async function fetchExchangeRate(from: string): Promise<number | null> {
-  if (from === 'INR') return 1
+export async function fetchExchangeRate(from: string, to: string = 'INR'): Promise<number | null> {
+  if (from === to) return 1
   try {
     const res = await fetch(
-      `https://api.frankfurter.app/latest?from=${from}&to=INR`,
+      `https://api.frankfurter.app/latest?from=${from}&to=${to}`,
       { cache: 'no-store' }
     )
     if (!res.ok) return null
     const data = await res.json() as { rates: Record<string, number> }
-    return data.rates?.INR ?? null
+    return data.rates?.[to] ?? null
   } catch {
     return null
   }
