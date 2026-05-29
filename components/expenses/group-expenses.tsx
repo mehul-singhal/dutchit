@@ -75,6 +75,8 @@ export function GroupExpenses({ groupId, userId, userRole, groupBaseCurrency = '
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['expenses', groupId] })
       queryClient.invalidateQueries({ queryKey: ['group-balances', groupId] })
+      queryClient.invalidateQueries({ queryKey: ['group-balance-summary', groupId] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] })
       toast.success('Expense deleted')
     },
     onError: () => toast.error('Failed to delete expense'),
@@ -279,6 +281,8 @@ export function GroupExpenses({ groupId, userId, userRole, groupBaseCurrency = '
         onSuccess={() => {
           queryClient.invalidateQueries({ queryKey: ['expenses', groupId] })
           queryClient.invalidateQueries({ queryKey: ['group-balances', groupId] })
+          queryClient.invalidateQueries({ queryKey: ['group-balance-summary', groupId] })
+          queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] })
           setAddOpen(false)
         }}
       />
@@ -314,7 +318,9 @@ export function GroupExpenses({ groupId, userId, userRole, groupBaseCurrency = '
           onSuccess={() => {
             queryClient.invalidateQueries({ queryKey: ['expenses', groupId] })
             queryClient.invalidateQueries({ queryKey: ['group-balances', groupId] })
+            queryClient.invalidateQueries({ queryKey: ['group-balance-summary', groupId] })
             queryClient.invalidateQueries({ queryKey: ['group-analytics', groupId] })
+            queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] })
             setEditingExpense(null)
           }}
         />

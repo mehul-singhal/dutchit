@@ -77,7 +77,7 @@ export function UpiPaymentSheet({ debt, groupId, baseCurrency = 'INR', open, onO
         amount: debt.amount,
         upi_ref: upiRef || null,
         payment_app: selectedApp ? appNames[selectedApp] : null,
-        status: 'pending_confirmation',
+        status: 'confirmed',
       })
 
       if (error) throw error
