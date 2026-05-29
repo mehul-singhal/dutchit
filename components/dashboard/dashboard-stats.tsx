@@ -81,57 +81,65 @@ export function DashboardStats({ userId }: Props) {
       totalOwe = Math.max(0, totalOwe - totalPaidOut)
       totalOwed = Math.max(0, totalOwed - totalReceived)
 
-      // Total expenses this month (in INR equivalent)
+      // Total expenses this month — user's own share only (in INR)
       const now = new Date()
       const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
-      const { data: monthExpenses } = await supabase
+      const { data: monthExpensesRaw } = await supabase
         .from('expenses')
-        .select('amount, inr_amount, true_inr_amount')
+        .select('amount, inr_amount, true_inr_amount, expense_splits(user_id, amount)')
         .in('group_id', groupIds)
         .gte('created_at', firstOfMonth)
 
-      const monthTotal = monthExpenses?.reduce((s, e) => s + (e.true_inr_amount ?? e.inr_amount ?? e.amount), 0) ?? 0
+      const monthExpenses = monthExpensesRaw as Array<{
+        amount: number
+        inr_amount: number | null
+        true_inr_amount: number | null
+        expense_splits: Array<{ user_id: string; amount: number }>
+      }> | null
+
+      let monthTotal = 0
+      for (const e of monthExpenses ?? []) {
+        const mySplit = e.expense_splits.find((s) => s.user_id === userId)
+        if (!mySplit) continue
+        const expenseTotalInr = e.true_inr_amount ?? e.inr_amount ?? e.amount
+        const splitsTotal = e.expense_splits.reduce((s, x) => s + x.amount, 0)
+        const scale = splitsTotal > 0 ? expenseTotalInr / splitsTotal : 1
+        monthTotal += mySplit.amount * scale
+      }
 
       return {
-        totalOwed: Math.round(totalOwed * 100) / 100,
-        totalOwe: Math.round(totalOwe * 100) / 100,
+        net: Math.round((totalOwed - totalOwe) * 100) / 100,
         groupCount: groupIds.length,
-        monthTotal,
+        monthTotal: Math.round(monthTotal * 100) / 100,
       }
     },
   })
 
   if (isLoading) {
     return (
-      <div className="grid grid-cols-2 gap-3">
-        {[1, 2, 3, 4].map((i) => (
+      <div className="grid grid-cols-3 gap-3">
+        {[1, 2, 3].map((i) => (
           <div key={i} className="h-28 glass rounded-2xl skeleton-shimmer" />
         ))}
       </div>
     )
   }
 
+  const net = stats?.net ?? 0
   const cards = [
     {
-      label: "You're owed",
-      value: stats?.totalOwed ?? 0,
-      icon: TrendingUp,
-      color: 'text-emerald-400',
-      bg: 'bg-emerald-400/10',
-      border: 'border-emerald-400/20',
-      positive: true,
-    },
-    {
-      label: 'You owe',
-      value: stats?.totalOwe ?? 0,
-      icon: TrendingDown,
-      color: 'text-rose-400',
-      bg: 'bg-rose-400/10',
-      border: 'border-rose-400/20',
-      positive: false,
+      label: net >= 0 ? "You're owed" : 'You owe',
+      sublabel: net >= 0 ? 'Net across all groups' : 'Net across all groups',
+      value: Math.abs(net),
+      icon: net >= 0 ? TrendingUp : TrendingDown,
+      color: net > 0 ? 'text-emerald-400' : net < 0 ? 'text-rose-400' : 'text-muted-foreground',
+      bg: net > 0 ? 'bg-emerald-400/10' : net < 0 ? 'bg-rose-400/10' : 'bg-white/5',
+      border: net > 0 ? 'border-emerald-400/20' : net < 0 ? 'border-rose-400/20' : 'border-white/10',
+      prefix: net > 0 ? '+' : net < 0 ? '-' : '',
     },
     {
       label: 'Groups',
+      sublabel: 'you are part of',
       value: stats?.groupCount ?? 0,
       icon: Users,
       color: 'text-indigo-400',
@@ -140,7 +148,8 @@ export function DashboardStats({ userId }: Props) {
       isCurrency: false,
     },
     {
-      label: 'This month',
+      label: 'My spend',
+      sublabel: `your share · ${new Date().toLocaleString('en-IN', { month: 'long' })}`,
       value: stats?.monthTotal ?? 0,
       icon: Receipt,
       color: 'text-amber-400',
@@ -150,7 +159,7 @@ export function DashboardStats({ userId }: Props) {
   ]
 
   return (
-    <div className="grid grid-cols-2 gap-3">
+    <div className="grid grid-cols-3 gap-3">
       {cards.map((card, i) => {
         const Icon = card.icon
         return (
@@ -167,13 +176,18 @@ export function DashboardStats({ userId }: Props) {
             <div className={`text-xl font-bold ${card.color}`}>
               {card.isCurrency === false ? (
                 <CountUp to={card.value} />
+              ) : net === 0 && card.label !== 'My spend' ? (
+                <span className="text-sm font-semibold text-muted-foreground">Settled</span>
               ) : (
                 <span>
-                  {getCurrency('INR').symbol}<CountUp to={card.value} decimals={0} />
+                  {'prefix' in card && card.prefix}{getCurrency('INR').symbol}<CountUp to={card.value} decimals={0} />
                 </span>
               )}
             </div>
-            <p className="text-xs text-muted-foreground mt-0.5">{card.label}</p>
+            <p className="text-xs font-medium mt-0.5">{card.label}</p>
+            {'sublabel' in card && card.sublabel && (
+              <p className="text-[10px] text-muted-foreground mt-0.5 leading-tight">{card.sublabel}</p>
+            )}
           </motion.div>
         )
       })}
