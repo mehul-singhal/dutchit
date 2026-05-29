@@ -24,6 +24,7 @@ import { BudgetTracker } from '@/components/finance/budget-tracker'
 import { IncomeTracker } from '@/components/finance/income-tracker'
 import { SavingsTracker } from '@/components/finance/savings-tracker'
 import { CountUp } from '@/components/animations/count-up'
+import { useFabAction } from '@/lib/utils/fab'
 import type { ExpenseCategory } from '@/types/database'
 import { cn } from '@/lib/utils'
 
@@ -43,6 +44,8 @@ interface Props {
 
 export function PersonalDashboard({ userId }: Props) {
   const [addOpen, setAddOpen] = useState(false)
+  const [addIncomeOpen, setAddIncomeOpen] = useState(false)
+  const [addSavingsOpen, setAddSavingsOpen] = useState(false)
   const [activeTab, setActiveTab] = useState('expenses')
   const [selectedMonth, setSelectedMonth] = useState(new Date())
   const [currency, setCurrency] = useState('INR')
@@ -51,6 +54,13 @@ export function PersonalDashboard({ userId }: Props) {
   const [currencyOpen, setCurrencyOpen] = useState(false)
   const supabase = createClient()
   const queryClient = useQueryClient()
+
+  // FAB → open the right dialog based on active tab
+  useFabAction(() => {
+    if (activeTab === 'income') setAddIncomeOpen(true)
+    else if (activeTab === 'savings') setAddSavingsOpen(true)
+    else setAddOpen(true)
+  })
 
   const { register, handleSubmit, watch, setValue, reset, formState: { errors, isSubmitting } } = useForm<ExpenseForm>({
     resolver: zodResolver(expenseSchema),
@@ -185,8 +195,12 @@ export function PersonalDashboard({ userId }: Props) {
           <h1 className="text-2xl font-bold">My Finance</h1>
           <p className="text-muted-foreground text-sm mt-0.5">{format(selectedMonth, 'MMMM yyyy')}</p>
         </div>
-        {activeTab !== 'income' && activeTab !== 'savings' && (
-          <Button className="gradient-teal text-[#0a0f1e] font-semibold gap-1" onClick={() => setAddOpen(true)}>
+        {activeTab !== 'analytics' && (
+          <Button className="gradient-teal text-[#0a0f1e] font-semibold gap-1" onClick={() => {
+            if (activeTab === 'income') setAddIncomeOpen(true)
+            else if (activeTab === 'savings') setAddSavingsOpen(true)
+            else setAddOpen(true)
+          }}>
             <Plus className="w-4 h-4" /> Add
           </Button>
         )}
@@ -340,11 +354,11 @@ export function PersonalDashboard({ userId }: Props) {
         </TabsContent>
 
         <TabsContent value="income">
-          <IncomeTracker userId={userId} month={selectedMonth} />
+          <IncomeTracker userId={userId} month={selectedMonth} addOpen={addIncomeOpen} onAddOpenChange={setAddIncomeOpen} />
         </TabsContent>
 
         <TabsContent value="savings">
-          <SavingsTracker userId={userId} month={selectedMonth} />
+          <SavingsTracker userId={userId} month={selectedMonth} addOpen={addSavingsOpen} onAddOpenChange={setAddSavingsOpen} />
         </TabsContent>
 
         <TabsContent value="analytics">

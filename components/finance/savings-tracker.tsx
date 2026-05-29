@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
 import { format, startOfMonth, endOfMonth } from 'date-fns'
-import { Plus, Trash2, Loader2, PiggyBank, ChevronDown } from 'lucide-react'
+import { Trash2, Loader2, PiggyBank, ChevronDown } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -31,10 +31,14 @@ type SavingsForm = z.infer<typeof savingsSchema>
 interface Props {
   userId: string
   month: Date
+  addOpen?: boolean
+  onAddOpenChange?: (open: boolean) => void
 }
 
-export function SavingsTracker({ userId, month }: Props) {
-  const [addOpen, setAddOpen] = useState(false)
+export function SavingsTracker({ userId, month, addOpen: externalAddOpen, onAddOpenChange }: Props) {
+  const [internalAddOpen, setInternalAddOpen] = useState(false)
+  const addOpen = externalAddOpen ?? internalAddOpen
+  const setAddOpen = onAddOpenChange ?? setInternalAddOpen
   const [editingGoal, setEditingGoal] = useState(false)
   const [goalInput, setGoalInput] = useState('')
   const [currency, setCurrency] = useState('INR')
@@ -148,18 +152,10 @@ export function SavingsTracker({ userId, month }: Props) {
   return (
     <div>
       {/* Header */}
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium">Total Saved</p>
-          <p className="text-2xl font-bold text-indigo-400">₹<CountUp to={total} /></p>
-          <p className="text-xs text-muted-foreground mt-0.5">{format(month, 'MMMM yyyy')}</p>
-        </div>
-        <Button
-          className="gradient-teal text-[#0a0f1e] font-semibold gap-1"
-          onClick={() => setAddOpen(true)}
-        >
-          <Plus className="w-4 h-4" /> Add Savings
-        </Button>
+      <div className="mb-4">
+        <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium">Total Saved</p>
+        <p className="text-2xl font-bold text-indigo-400">₹<CountUp to={total} /></p>
+        <p className="text-xs text-muted-foreground mt-0.5">{format(month, 'MMMM yyyy')}</p>
       </div>
 
       {/* Goal tracker */}

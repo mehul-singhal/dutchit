@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
 import { format } from 'date-fns'
-import { Plus, Trash2, Loader2, ChevronDown } from 'lucide-react'
+import { Trash2, Loader2, ChevronDown } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -32,10 +32,14 @@ type IncomeForm = z.infer<typeof incomeSchema>
 interface Props {
   userId: string
   month: Date
+  addOpen?: boolean
+  onAddOpenChange?: (open: boolean) => void
 }
 
-export function IncomeTracker({ userId, month }: Props) {
-  const [addOpen, setAddOpen] = useState(false)
+export function IncomeTracker({ userId, month, addOpen: externalAddOpen, onAddOpenChange }: Props) {
+  const [internalAddOpen, setInternalAddOpen] = useState(false)
+  const addOpen = externalAddOpen ?? internalAddOpen
+  const setAddOpen = onAddOpenChange ?? setInternalAddOpen
   const [currency, setCurrency] = useState('INR')
   const [exchangeRate, setExchangeRate] = useState(1)
   const [fetchingRate, setFetchingRate] = useState(false)
@@ -121,18 +125,10 @@ export function IncomeTracker({ userId, month }: Props) {
   return (
     <div>
       {/* Header */}
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium">Total Income</p>
-          <p className="text-2xl font-bold text-emerald-400">₹<CountUp to={total} /></p>
-          <p className="text-xs text-muted-foreground mt-0.5">{format(month, 'MMMM yyyy')}</p>
-        </div>
-        <Button
-          className="gradient-teal text-[#0a0f1e] font-semibold gap-1"
-          onClick={() => setAddOpen(true)}
-        >
-          <Plus className="w-4 h-4" /> Add Income
-        </Button>
+      <div className="mb-4">
+        <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium">Total Income</p>
+        <p className="text-2xl font-bold text-emerald-400">₹<CountUp to={total} /></p>
+        <p className="text-xs text-muted-foreground mt-0.5">{format(month, 'MMMM yyyy')}</p>
       </div>
 
       {/* List */}
