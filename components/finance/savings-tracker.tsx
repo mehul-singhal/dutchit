@@ -1,10 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
 import { format, startOfMonth, endOfMonth } from 'date-fns'
-import { Plus, Trash2, Loader2, PiggyBank } from 'lucide-react'
+import { Plus, Trash2, Loader2, PiggyBank, ChevronDown } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -16,6 +16,7 @@ import { Progress } from '@/components/ui/progress'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { createClient } from '@/lib/supabase/client'
 import { formatINR } from '@/lib/utils/formatters'
+import { SUPPORTED_CURRENCIES, fetchExchangeRate, getCurrency, formatCurrency } from '@/lib/utils/currency'
 import { CountUp } from '@/components/animations/count-up'
 import { cn } from '@/lib/utils'
 
@@ -36,16 +37,33 @@ export function SavingsTracker({ userId, month }: Props) {
   const [addOpen, setAddOpen] = useState(false)
   const [editingGoal, setEditingGoal] = useState(false)
   const [goalInput, setGoalInput] = useState('')
+  const [currency, setCurrency] = useState('INR')
+  const [exchangeRate, setExchangeRate] = useState(1)
+  const [fetchingRate, setFetchingRate] = useState(false)
+  const [currencyOpen, setCurrencyOpen] = useState(false)
   const supabase = createClient()
   const queryClient = useQueryClient()
 
   const monthStart = startOfMonth(month).toISOString().split('T')[0]
   const monthEnd = endOfMonth(month).toISOString().split('T')[0]
 
-  const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<SavingsForm>({
+  const { register, handleSubmit, watch, reset, formState: { errors, isSubmitting } } = useForm<SavingsForm>({
     resolver: zodResolver(savingsSchema),
     defaultValues: { date: format(new Date(), 'yyyy-MM-dd') },
   })
+  const amount = parseFloat(watch('amount') || '0')
+  const inrAmount = amount * exchangeRate
+
+  useEffect(() => {
+    if (currency === 'INR') { setExchangeRate(1); return }
+    setFetchingRate(true)
+    fetchExchangeRate(currency)
+      .then((rate) => {
+        if (rate) { setExchangeRate(rate) }
+        else { toast.error('Could not fetch exchange rate'); setCurrency('INR'); setExchangeRate(1) }
+      })
+      .finally(() => setFetchingRate(false))
+  }, [currency])
 
   const { data: savingsList, isLoading } = useQuery({
     queryKey: ['personal-savings', userId, monthStart],
@@ -80,7 +98,6 @@ export function SavingsTracker({ userId, month }: Props) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['personal-savings'] })
-      queryClient.invalidateQueries({ queryKey: ['finance-overview'] })
       queryClient.invalidateQueries({ queryKey: ['monthly-totals'] })
       toast.success('Entry deleted')
     },
@@ -105,22 +122,28 @@ export function SavingsTracker({ userId, month }: Props) {
       user_id: userId,
       title: data.title,
       amount: parseFloat(data.amount),
+      currency,
+      inr_amount: Math.round(inrAmount * 100) / 100,
+      exchange_rate: exchangeRate,
       date: data.date,
       notes: data.notes || null,
     })
     if (error) { toast.error('Failed to add savings entry'); return }
     queryClient.invalidateQueries({ queryKey: ['personal-savings'] })
-    queryClient.invalidateQueries({ queryKey: ['finance-overview'] })
     queryClient.invalidateQueries({ queryKey: ['monthly-totals'] })
     toast.success('Savings entry added!')
     reset()
+    setCurrency('INR')
+    setExchangeRate(1)
     setAddOpen(false)
   }
 
-  const total = savingsList?.reduce((s, e) => s + e.amount, 0) ?? 0
+  // Use inr_amount for totals, fall back to amount for pre-migration rows
+  const total = savingsList?.reduce((s, e) => s + (e.inr_amount ?? e.amount), 0) ?? 0
   const goal = settings?.monthly_savings_goal ?? 0
   const pct = goal > 0 ? Math.min((total / goal) * 100, 100) : 0
   const isGoalMet = goal > 0 && total >= goal
+  const selectedCurrencyMeta = getCurrency(currency)
 
   return (
     <div>
@@ -215,31 +238,43 @@ export function SavingsTracker({ userId, month }: Props) {
       ) : (
         <div className="space-y-2">
           <AnimatePresence>
-            {savingsList?.map((entry, i) => (
-              <motion.div
-                key={entry.id}
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 10 }}
-                transition={{ delay: i * 0.03 }}
-                className="glass rounded-xl p-3 flex items-center gap-3 group"
-              >
-                <div className="w-9 h-9 rounded-xl bg-indigo-400/10 flex items-center justify-center text-lg shrink-0">
-                  🐷
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{entry.title}</p>
-                  <p className="text-xs text-muted-foreground">{format(new Date(entry.date), 'MMM d')}</p>
-                </div>
-                <span className="font-semibold text-sm text-indigo-400">{formatINR(entry.amount)}</span>
-                <button
-                  onClick={() => deleteSavings.mutate(entry.id)}
-                  className="opacity-0 group-hover:opacity-100 p-1 text-muted-foreground hover:text-rose-400 transition-all"
+            {savingsList?.map((entry, i) => {
+              const isForeign = entry.currency && entry.currency !== 'INR'
+              return (
+                <motion.div
+                  key={entry.id}
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 10 }}
+                  transition={{ delay: i * 0.03 }}
+                  className="glass rounded-xl p-3 flex items-center gap-3 group"
                 >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
-              </motion.div>
-            ))}
+                  <div className="w-9 h-9 rounded-xl bg-indigo-400/10 flex items-center justify-center text-lg shrink-0">
+                    🐷
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{entry.title}</p>
+                    <p className="text-xs text-muted-foreground">{format(new Date(entry.date), 'MMM d')}</p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    {isForeign && entry.inr_amount ? (
+                      <>
+                        <span className="font-semibold text-sm text-indigo-400">{formatCurrency(entry.amount, entry.currency)}</span>
+                        <p className="text-xs text-muted-foreground">{formatINR(entry.inr_amount)}</p>
+                      </>
+                    ) : (
+                      <span className="font-semibold text-sm text-indigo-400">{formatINR(entry.inr_amount ?? entry.amount)}</span>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => deleteSavings.mutate(entry.id)}
+                    className="opacity-0 group-hover:opacity-100 p-1 text-muted-foreground hover:text-rose-400 transition-all"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </motion.div>
+              )
+            })}
           </AnimatePresence>
         </div>
       )}
@@ -256,23 +291,60 @@ export function SavingsTracker({ userId, month }: Props) {
               <Input placeholder="e.g. SIP, Emergency Fund, FD..." className="bg-white/5 border-white/10" {...register('title')} />
               {errors.title && <p className="text-destructive text-xs">{errors.title.message}</p>}
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label>Amount (₹)</Label>
+            <div className="space-y-1.5">
+              <Label>Amount</Label>
+              <div className="flex gap-2">
+                {/* Currency selector */}
                 <div className="relative">
-                  <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground">₹</span>
-                  <Input type="number" step="0.01" className="pl-6 bg-white/5 border-white/10" {...register('amount')} />
+                  <button
+                    type="button"
+                    onClick={() => setCurrencyOpen(!currencyOpen)}
+                    className="flex items-center gap-1 h-9 px-3 rounded-xl border border-white/10 bg-white/5 hover:bg-white/8 transition-colors text-sm font-medium min-w-[70px]"
+                  >
+                    <span>{selectedCurrencyMeta.symbol}</span>
+                    <span className="text-xs text-muted-foreground">{currency}</span>
+                    <ChevronDown className="w-3 h-3 text-muted-foreground" />
+                  </button>
+                  {currencyOpen && (
+                    <div className="absolute top-10 left-0 z-50 glass-strong border border-white/10 rounded-xl overflow-hidden w-52 shadow-xl max-h-60 overflow-y-auto">
+                      {SUPPORTED_CURRENCIES.map((c) => (
+                        <button
+                          key={c.code}
+                          type="button"
+                          onClick={() => { setCurrency(c.code); setCurrencyOpen(false) }}
+                          className={cn(
+                            'w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left transition-colors',
+                            currency === c.code ? 'bg-primary/15 text-primary' : 'hover:bg-white/5 text-foreground'
+                          )}
+                        >
+                          <span className="w-6 text-center font-medium">{c.symbol}</span>
+                          <span className="font-medium">{c.code}</span>
+                          <span className="text-muted-foreground text-xs truncate">{c.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
-                {errors.amount && <p className="text-destructive text-xs">{errors.amount.message}</p>}
+                <Input type="number" step="0.01" className="flex-1 bg-white/5 border-white/10" {...register('amount')} />
               </div>
-              <div className="space-y-1.5">
-                <Label>Date</Label>
-                <Input type="date" className="bg-white/5 border-white/10" {...register('date')} />
-              </div>
+              {errors.amount && <p className="text-destructive text-xs">{errors.amount.message}</p>}
+              {currency !== 'INR' && amount > 0 && (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  {fetchingRate ? (
+                    <><Loader2 className="w-3 h-3 animate-spin" /> Fetching rate...</>
+                  ) : (
+                    <><span className="text-primary font-medium">{formatINR(inrAmount)}</span><span>· 1 {currency} = {formatINR(exchangeRate)}</span></>
+                  )}
+                </div>
+              )}
+            </div>
+            <div className="space-y-1.5">
+              <Label>Date</Label>
+              <Input type="date" className="bg-white/5 border-white/10" {...register('date')} />
             </div>
             <div className="flex gap-3">
               <Button type="button" variant="ghost" className="flex-1" onClick={() => setAddOpen(false)}>Cancel</Button>
-              <Button type="submit" className="flex-1 gradient-teal text-[#0a0f1e] font-semibold" disabled={isSubmitting}>
+              <Button type="submit" className="flex-1 gradient-teal text-[#0a0f1e] font-semibold" disabled={isSubmitting || fetchingRate}>
                 {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Add Savings'}
               </Button>
             </div>

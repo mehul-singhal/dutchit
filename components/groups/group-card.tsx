@@ -6,6 +6,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Users, ChevronRight } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { GROUP_CATEGORY_META } from '@/components/groups/group-category-meta'
+import { formatINR } from '@/lib/utils/formatters'
 import type { Group } from '@/types/database'
 
 interface Props {
@@ -80,7 +81,7 @@ export function GroupCard({ group, userId }: Props) {
           </div>
           {balance !== undefined && Math.abs(balance) > 0.01 && (
             <span className={`text-xs font-semibold ${balance > 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-              {balance > 0 ? '+' : ''}₹{Math.abs(balance).toLocaleString('en-IN')}
+              {balance > 0 ? '+' : '-'}{formatINR(Math.abs(balance))}
             </span>
           )}
         </div>

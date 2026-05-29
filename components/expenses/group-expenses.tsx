@@ -10,6 +10,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { createClient } from '@/lib/supabase/client'
 import { formatINR, formatDate, getInitials } from '@/lib/utils/formatters'
+import { formatCurrency } from '@/lib/utils/currency'
 import { AddExpenseSheet } from '@/components/expenses/add-expense-sheet'
 import { EXPENSE_CATEGORY_META } from '@/components/expenses/expense-category-meta'
 import { useFabAction } from '@/lib/utils/fab'
@@ -167,7 +168,14 @@ export function GroupExpenses({ groupId, userId, userRole }: Props) {
                       </p>
                     </div>
                     <div className="text-right shrink-0">
-                      <p className="font-semibold text-sm">{formatINR(expense.amount)}</p>
+                      {expense.currency !== 'INR' && expense.inr_amount ? (
+                        <>
+                          <p className="font-semibold text-sm">{formatCurrency(expense.amount, expense.currency)}</p>
+                          <p className="text-xs text-muted-foreground">{formatINR(expense.inr_amount)}</p>
+                        </>
+                      ) : (
+                        <p className="font-semibold text-sm">{formatINR(expense.inr_amount ?? expense.amount)}</p>
+                      )}
                       {mySplit && (
                         <p className={`text-xs ${paidBy?.id === userId ? 'text-emerald-400' : 'text-rose-400'}`}>
                           {paidBy?.id === userId ? 'you get back' : 'your share'} {formatINR(mySplit.amount)}
@@ -283,6 +291,9 @@ export function GroupExpenses({ groupId, userId, userRole }: Props) {
             id: editingExpense.id,
             title: editingExpense.title,
             amount: editingExpense.amount,
+            currency: editingExpense.currency ?? 'INR',
+            inr_amount: editingExpense.inr_amount ?? null,
+            exchange_rate: editingExpense.exchange_rate ?? null,
             category: editingExpense.category,
             date: editingExpense.date,
             paid_by: editingExpense.paid_by,

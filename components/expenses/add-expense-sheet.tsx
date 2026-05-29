@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Loader2, Camera, X } from 'lucide-react'
+import { Loader2, Camera, X, ChevronDown } from 'lucide-react'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import {
@@ -30,6 +30,7 @@ import {
   calculateAdjustmentSplits,
 } from '@/lib/utils/split-calculator'
 import { getInitials, formatINR } from '@/lib/utils/formatters'
+import { SUPPORTED_CURRENCIES, fetchExchangeRate, getCurrency } from '@/lib/utils/currency'
 import type { SplitType, ExpenseCategory, UserProfile } from '@/types/database'
 import { cn } from '@/lib/utils'
 
@@ -48,6 +49,9 @@ interface ExpenseToEdit {
   id: string
   title: string
   amount: number
+  currency: string
+  inr_amount: number | null
+  exchange_rate: number | null
   category: ExpenseCategory
   date: string
   paid_by: string
@@ -79,6 +83,10 @@ export function AddExpenseSheet({ open, onOpenChange, groupId, userId, expense, 
   const [splitData, setSplitData] = useState<Record<string, number | boolean>>({})
   const [uploading, setUploading] = useState(false)
   const [receiptUrl, setReceiptUrl] = useState('')
+  const [currency, setCurrency] = useState('INR')
+  const [exchangeRate, setExchangeRate] = useState(1)
+  const [fetchingRate, setFetchingRate] = useState(false)
+  const [currencyOpen, setCurrencyOpen] = useState(false)
   const splitTypeInitRef = useRef(true)
   const supabase = createClient()
 
@@ -93,11 +101,31 @@ export function AddExpenseSheet({ open, onOpenChange, groupId, userId, expense, 
     })
 
   const amount = parseFloat(watch('amount') || '0')
+  const inrAmount = amount * exchangeRate
+
+  // Fetch exchange rate when currency changes
+  useEffect(() => {
+    if (currency === 'INR') {
+      setExchangeRate(1)
+      return
+    }
+    setFetchingRate(true)
+    fetchExchangeRate(currency)
+      .then((rate) => {
+        if (rate) {
+          setExchangeRate(rate)
+        } else {
+          toast.error('Could not fetch exchange rate — please try again')
+          setCurrency('INR')
+          setExchangeRate(1)
+        }
+      })
+      .finally(() => setFetchingRate(false))
+  }, [currency])
 
   // Load members, then pre-fill if editing
   useEffect(() => {
     if (!open) return
-    // Mark that the next splitType change from pre-fill should not reset data
     splitTypeInitRef.current = true
     supabase
       .from('group_members')
@@ -109,7 +137,6 @@ export function AddExpenseSheet({ open, onOpenChange, groupId, userId, expense, 
         setMembers(users)
 
         if (expense) {
-          // Pre-fill form fields
           setValue('title', expense.title)
           setValue('amount', String(expense.amount))
           setValue('category', expense.category)
@@ -117,12 +144,12 @@ export function AddExpenseSheet({ open, onOpenChange, groupId, userId, expense, 
           setValue('paid_by', expense.paid_by)
           setValue('notes', expense.notes ?? '')
           setReceiptUrl(expense.receipt_url ?? '')
+          setCurrency(expense.currency ?? 'INR')
+          setExchangeRate(expense.exchange_rate ?? 1)
 
-          // Detect split type from first split
           const detectedType = expense.expense_splits[0]?.split_type ?? 'equal'
           setSplitType(detectedType)
 
-          // Pre-fill split data — restore the right value per split type
           if (detectedType === 'equal') {
             const d: Record<string, boolean> = {}
             users.forEach((u) => (d[u.id] = expense.expense_splits.some((s) => s.user_id === u.id)))
@@ -131,8 +158,7 @@ export function AddExpenseSheet({ open, onOpenChange, groupId, userId, expense, 
             const d: Record<string, number> = {}
             users.forEach((u) => {
               const s = expense.expense_splits.find((sp) => sp.user_id === u.id)
-              // percentage stored in split record; fall back to deriving from amount
-              d[u.id] = s ? (s.percentage ?? Math.round((s.amount / expense.amount) * 10000) / 100) : 0
+              d[u.id] = s ? (s.percentage ?? Math.round((s.amount / (expense.inr_amount ?? expense.amount)) * 10000) / 100) : 0
             })
             setSplitData(d)
           } else if (detectedType === 'shares') {
@@ -150,7 +176,6 @@ export function AddExpenseSheet({ open, onOpenChange, groupId, userId, expense, 
             })
             setSplitData(d)
           } else {
-            // exact — use stored amounts
             const d: Record<string, number> = {}
             users.forEach((u) => {
               const s = expense.expense_splits.find((sp) => sp.user_id === u.id)
@@ -159,13 +184,14 @@ export function AddExpenseSheet({ open, onOpenChange, groupId, userId, expense, 
             setSplitData(d)
           }
         } else {
-          // New expense defaults
           reset({
             category: 'other',
             date: format(new Date(), 'yyyy-MM-dd'),
             paid_by: userId,
           })
           setSplitType('equal')
+          setCurrency('INR')
+          setExchangeRate(1)
           const init: Record<string, boolean> = {}
           users.forEach((u) => (init[u.id] = true))
           setSplitData(init)
@@ -174,23 +200,20 @@ export function AddExpenseSheet({ open, onOpenChange, groupId, userId, expense, 
       })
   }, [open, groupId, expense])
 
-  // Reset split data whenever split type changes
-  // We use a ref to track whether this is the initial load (from editing pre-fill) or a user-driven change
+  // Reset split data when split type changes (user-driven)
   useEffect(() => {
     if (!members.length) return
-    // Skip the very first run after members load — the open-effect above already set splitData correctly
     if (splitTypeInitRef.current) {
       splitTypeInitRef.current = false
       return
     }
-    // User explicitly changed the split type — reset to sensible defaults
-    const currentAmount = parseFloat(watch('amount') || '0')
+    const currentInrAmount = parseFloat(watch('amount') || '0') * exchangeRate
     if (splitType === 'equal') {
       const d: Record<string, boolean> = {}
       members.forEach((u) => (d[u.id] = true))
       setSplitData(d)
     } else if (splitType === 'exact') {
-      const perPerson = currentAmount > 0 ? Math.round((currentAmount / members.length) * 100) / 100 : 0
+      const perPerson = currentInrAmount > 0 ? Math.round((currentInrAmount / members.length) * 100) / 100 : 0
       const d: Record<string, number> = {}
       members.forEach((u) => (d[u.id] = perPerson))
       setSplitData(d)
@@ -211,19 +234,20 @@ export function AddExpenseSheet({ open, onOpenChange, groupId, userId, expense, 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [splitType])
 
+  // Splits are always computed in INR
   function computeSplits() {
-    if (!amount || !members.length) return []
+    if (!inrAmount || !members.length) return []
     switch (splitType) {
       case 'equal':
-        return calculateEqualSplits(amount, members.map((m) => ({ userId: m.id, included: !!splitData[m.id] })))
+        return calculateEqualSplits(inrAmount, members.map((m) => ({ userId: m.id, included: !!splitData[m.id] })))
       case 'exact':
         return calculateExactSplits(members.map((m) => ({ userId: m.id, amount: Number(splitData[m.id] ?? 0) })))
       case 'percentage':
-        return calculatePercentageSplits(amount, members.map((m) => ({ userId: m.id, percentage: Number(splitData[m.id] ?? 0) })))
+        return calculatePercentageSplits(inrAmount, members.map((m) => ({ userId: m.id, percentage: Number(splitData[m.id] ?? 0) })))
       case 'shares':
-        return calculateShareSplits(amount, members.map((m) => ({ userId: m.id, shares: Number(splitData[m.id] ?? 1) })))
+        return calculateShareSplits(inrAmount, members.map((m) => ({ userId: m.id, shares: Number(splitData[m.id] ?? 1) })))
       case 'adjustment':
-        return calculateAdjustmentSplits(amount, members.map((m) => ({ userId: m.id, adjustedAmount: Number(splitData[m.id] ?? 0) })))
+        return calculateAdjustmentSplits(inrAmount, members.map((m) => ({ userId: m.id, adjustedAmount: Number(splitData[m.id] ?? 0) })))
       default:
         return []
     }
@@ -254,7 +278,6 @@ export function AddExpenseSheet({ open, onOpenChange, groupId, userId, expense, 
       return
     }
 
-    // Validate totals before saving
     if (splitType === 'percentage') {
       const pctSum = members.reduce((s, m) => s + Number(splitData[m.id] ?? 0), 0)
       if (Math.abs(pctSum - 100) > 0.5) {
@@ -264,26 +287,29 @@ export function AddExpenseSheet({ open, onOpenChange, groupId, userId, expense, 
     }
     if (splitType === 'exact') {
       const amountSum = members.reduce((s, m) => s + Number(splitData[m.id] ?? 0), 0)
-      const total = parseFloat(data.amount)
-      if (Math.abs(amountSum - total) > 0.5) {
-        toast.error(`Exact amounts must sum to ${formatINR(total)} (currently ${formatINR(amountSum)})`)
+      if (Math.abs(amountSum - inrAmount) > 0.5) {
+        toast.error(`Exact amounts must sum to ${formatINR(inrAmount)} (currently ${formatINR(amountSum)})`)
         return
       }
     }
 
+    const expensePayload = {
+      title: data.title,
+      amount: parseFloat(data.amount),
+      currency,
+      inr_amount: Math.round(inrAmount * 100) / 100,
+      exchange_rate: exchangeRate,
+      category: data.category,
+      date: data.date,
+      paid_by: data.paid_by,
+      notes: data.notes || null,
+      receipt_url: receiptUrl || null,
+    }
+
     if (isEditing && expense) {
-      // Update expense
       const { error } = await supabase
         .from('expenses')
-        .update({
-          title: data.title,
-          amount: parseFloat(data.amount),
-          category: data.category,
-          date: data.date,
-          paid_by: data.paid_by,
-          notes: data.notes || null,
-          receipt_url: receiptUrl || null,
-        })
+        .update(expensePayload)
         .eq('id', expense.id)
 
       if (error) {
@@ -291,7 +317,6 @@ export function AddExpenseSheet({ open, onOpenChange, groupId, userId, expense, 
         return
       }
 
-      // Replace splits: delete old, insert new
       await supabase.from('expense_splits').delete().eq('expense_id', expense.id)
       const { error: splitsError } = await supabase.from('expense_splits').insert(
         splits.map((s) => ({
@@ -312,20 +337,9 @@ export function AddExpenseSheet({ open, onOpenChange, groupId, userId, expense, 
 
       toast.success(`"${data.title}" updated!`)
     } else {
-      // Insert new expense
       const { data: newExpense, error } = await supabase
         .from('expenses')
-        .insert({
-          group_id: groupId,
-          title: data.title,
-          amount: parseFloat(data.amount),
-          category: data.category,
-          date: data.date,
-          paid_by: data.paid_by,
-          notes: data.notes || null,
-          receipt_url: receiptUrl || null,
-          created_by: userId,
-        })
+        .insert({ group_id: groupId, created_by: userId, ...expensePayload })
         .select()
         .single()
 
@@ -356,6 +370,8 @@ export function AddExpenseSheet({ open, onOpenChange, groupId, userId, expense, 
       reset()
       setReceiptUrl('')
       setSplitType('equal')
+      setCurrency('INR')
+      setExchangeRate(1)
     }
 
     onSuccess()
@@ -364,6 +380,7 @@ export function AddExpenseSheet({ open, onOpenChange, groupId, userId, expense, 
   const categories = Object.entries(EXPENSE_CATEGORY_META) as [ExpenseCategory, { label: string; emoji: string }][]
   const selectedCategory = watch('category')
   const selectedPaidBy = watch('paid_by')
+  const selectedCurrencyMeta = getCurrency(currency)
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -387,18 +404,68 @@ export function AddExpenseSheet({ open, onOpenChange, groupId, userId, expense, 
           </div>
 
           <div className="space-y-1.5">
-            <Label>Amount (₹)</Label>
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-medium">₹</span>
-              <Input
-                type="number"
-                step="0.01"
-                placeholder="0.00"
-                className="pl-7 bg-white/5 border-white/10 h-11 text-lg font-semibold"
-                {...register('amount')}
-              />
+            <Label>Amount</Label>
+            <div className="flex gap-2">
+              {/* Currency selector */}
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setCurrencyOpen(!currencyOpen)}
+                  className="flex items-center gap-1 h-11 px-3 rounded-xl border border-white/10 bg-white/5 hover:bg-white/8 transition-colors text-sm font-medium min-w-[70px]"
+                >
+                  <span>{selectedCurrencyMeta.symbol}</span>
+                  <span className="text-xs text-muted-foreground">{currency}</span>
+                  <ChevronDown className="w-3 h-3 text-muted-foreground" />
+                </button>
+                {currencyOpen && (
+                  <div className="absolute top-12 left-0 z-50 glass-strong border border-white/10 rounded-xl overflow-hidden w-52 shadow-xl">
+                    {SUPPORTED_CURRENCIES.map((c) => (
+                      <button
+                        key={c.code}
+                        type="button"
+                        onClick={() => { setCurrency(c.code); setCurrencyOpen(false) }}
+                        className={cn(
+                          'w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left transition-colors',
+                          currency === c.code
+                            ? 'bg-primary/15 text-primary'
+                            : 'hover:bg-white/5 text-foreground'
+                        )}
+                      >
+                        <span className="w-6 text-center font-medium">{c.symbol}</span>
+                        <span className="font-medium">{c.code}</span>
+                        <span className="text-muted-foreground text-xs truncate">{c.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Amount input */}
+              <div className="flex-1">
+                <Input
+                  type="number"
+                  step="0.01"
+                  placeholder="0.00"
+                  className="bg-white/5 border-white/10 h-11 text-lg font-semibold"
+                  {...register('amount')}
+                />
+              </div>
             </div>
             {errors.amount && <p className="text-destructive text-xs">{errors.amount.message}</p>}
+
+            {/* INR equivalent preview for non-INR currencies */}
+            {currency !== 'INR' && amount > 0 && (
+              <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
+                {fetchingRate ? (
+                  <><Loader2 className="w-3 h-3 animate-spin" /> Fetching rate...</>
+                ) : (
+                  <>
+                    <span className="text-primary font-medium">{formatINR(inrAmount)}</span>
+                    <span>· 1 {currency} = {formatINR(exchangeRate)}</span>
+                  </>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -465,7 +532,7 @@ export function AddExpenseSheet({ open, onOpenChange, groupId, userId, expense, 
               splitType={splitType}
               members={members}
               currentUserId={userId}
-              totalAmount={amount}
+              totalAmount={inrAmount}
               splitData={splitData}
               onChange={setSplitData}
             />
@@ -509,7 +576,7 @@ export function AddExpenseSheet({ open, onOpenChange, groupId, userId, expense, 
           <Button
             type="submit"
             className="w-full h-11 gradient-teal text-[#0a0f1e] font-semibold"
-            disabled={isSubmitting}
+            disabled={isSubmitting || fetchingRate}
           >
             {isSubmitting ? (
               <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> {isEditing ? 'Saving...' : 'Adding...'}</>

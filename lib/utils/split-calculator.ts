@@ -123,15 +123,3 @@ export function validatePercentages(percentages: number[]): boolean {
   const sum = percentages.reduce((acc, p) => acc + p, 0)
   return Math.abs(sum - 100) < 0.01
 }
-
-/**
- * Format currency in Indian format (₹1,23,456.78)
- */
-export function formatINR(amount: number): string {
-  return new Intl.NumberFormat('en-IN', {
-    style: 'currency',
-    currency: 'INR',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  }).format(amount)
-}

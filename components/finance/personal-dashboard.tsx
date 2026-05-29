@@ -1,10 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
 import { format, startOfMonth, endOfMonth, subMonths } from 'date-fns'
-import { Plus, Loader2, Trash2 } from 'lucide-react'
+import { Plus, Loader2, Trash2, ChevronDown } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -16,6 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { createClient } from '@/lib/supabase/client'
 import { formatINR } from '@/lib/utils/formatters'
+import { SUPPORTED_CURRENCIES, fetchExchangeRate, getCurrency, formatCurrency } from '@/lib/utils/currency'
 import { EXPENSE_CATEGORY_META } from '@/components/expenses/expense-category-meta'
 import { SpendingChart } from '@/components/finance/spending-chart'
 import { CategoryBreakdown } from '@/components/finance/category-breakdown'
@@ -44,6 +45,10 @@ export function PersonalDashboard({ userId }: Props) {
   const [addOpen, setAddOpen] = useState(false)
   const [activeTab, setActiveTab] = useState('expenses')
   const [selectedMonth, setSelectedMonth] = useState(new Date())
+  const [currency, setCurrency] = useState('INR')
+  const [exchangeRate, setExchangeRate] = useState(1)
+  const [fetchingRate, setFetchingRate] = useState(false)
+  const [currencyOpen, setCurrencyOpen] = useState(false)
   const supabase = createClient()
   const queryClient = useQueryClient()
 
@@ -53,6 +58,19 @@ export function PersonalDashboard({ userId }: Props) {
   })
   const selectedCategory = watch('category')
   const selectedPaidFrom = watch('paid_from')
+  const amount = parseFloat(watch('amount') || '0')
+  const inrAmount = amount * exchangeRate
+
+  useEffect(() => {
+    if (currency === 'INR') { setExchangeRate(1); return }
+    setFetchingRate(true)
+    fetchExchangeRate(currency)
+      .then((rate) => {
+        if (rate) { setExchangeRate(rate) }
+        else { toast.error('Could not fetch exchange rate'); setCurrency('INR'); setExchangeRate(1) }
+      })
+      .finally(() => setFetchingRate(false))
+  }, [currency])
 
   const monthStart = startOfMonth(selectedMonth).toISOString().split('T')[0]
   const monthEnd = endOfMonth(selectedMonth).toISOString().split('T')[0]
@@ -71,14 +89,14 @@ export function PersonalDashboard({ userId }: Props) {
     queryKey: ['monthly-totals', userId, monthStart],
     queryFn: async () => {
       const [incomeRes, savingsRes] = await Promise.all([
-        supabase.from('personal_income').select('amount').eq('user_id', userId)
+        supabase.from('personal_income').select('amount, inr_amount').eq('user_id', userId)
           .eq('month', selectedMonth.getMonth() + 1).eq('year', selectedMonth.getFullYear()),
-        supabase.from('personal_savings').select('amount').eq('user_id', userId)
+        supabase.from('personal_savings').select('amount, inr_amount').eq('user_id', userId)
           .gte('date', monthStart).lte('date', monthEnd),
       ])
       return {
-        totalIncome: (incomeRes.data ?? []).reduce((s, r) => s + r.amount, 0),
-        totalSavings: (savingsRes.data ?? []).reduce((s, r) => s + r.amount, 0),
+        totalIncome: (incomeRes.data ?? []).reduce((s, r) => s + (r.inr_amount ?? r.amount), 0),
+        totalSavings: (savingsRes.data ?? []).reduce((s, r) => s + (r.inr_amount ?? r.amount), 0),
       }
     },
   })
@@ -91,13 +109,13 @@ export function PersonalDashboard({ userId }: Props) {
         const start = startOfMonth(month).toISOString().split('T')[0]
         const end = endOfMonth(month).toISOString().split('T')[0]
         const [expRes, incRes] = await Promise.all([
-          supabase.from('personal_expenses').select('amount').eq('user_id', userId).gte('date', start).lte('date', end),
-          supabase.from('personal_income').select('amount').eq('user_id', userId).eq('month', month.getMonth() + 1).eq('year', month.getFullYear()),
+          supabase.from('personal_expenses').select('amount, inr_amount').eq('user_id', userId).gte('date', start).lte('date', end),
+          supabase.from('personal_income').select('amount, inr_amount').eq('user_id', userId).eq('month', month.getMonth() + 1).eq('year', month.getFullYear()),
         ])
         return {
           month: format(month, 'MMM'),
-          total: (expRes.data ?? []).reduce((s, e) => s + e.amount, 0),
-          income: (incRes.data ?? []).reduce((s, e) => s + e.amount, 0),
+          total: (expRes.data ?? []).reduce((s, e) => s + (e.inr_amount ?? e.amount), 0),
+          income: (incRes.data ?? []).reduce((s, e) => s + (e.inr_amount ?? e.amount), 0),
         }
       }))
     },
@@ -121,6 +139,9 @@ export function PersonalDashboard({ userId }: Props) {
       user_id: userId,
       title: data.title,
       amount: parseFloat(data.amount),
+      currency,
+      inr_amount: Math.round(inrAmount * 100) / 100,
+      exchange_rate: exchangeRate,
       category: data.category,
       date: data.date,
       notes: data.notes || null,
@@ -132,25 +153,29 @@ export function PersonalDashboard({ userId }: Props) {
     queryClient.invalidateQueries({ queryKey: ['monthly-totals'] })
     toast.success('Expense added!')
     reset()
+    setCurrency('INR')
+    setExchangeRate(1)
     setAddOpen(false)
   }
 
-  const totalExpenses = expenses?.reduce((s, e) => s + e.amount, 0) ?? 0
+  // Use inr_amount for totals, fall back to amount for pre-migration rows
+  const totalExpenses = expenses?.reduce((s, e) => s + (e.inr_amount ?? e.amount), 0) ?? 0
   const totalIncome = monthlyTotals?.totalIncome ?? 0
   const totalSavings = monthlyTotals?.totalSavings ?? 0
   const freeCash = totalIncome - totalExpenses - totalSavings
   const savingsRate = totalIncome > 0 ? (totalSavings / totalIncome) * 100 : null
   const categories = Object.entries(EXPENSE_CATEGORY_META) as [ExpenseCategory, { label: string; emoji: string }][]
   const categoryTotals = expenses?.reduce((acc, e) => {
-    acc[e.category] = (acc[e.category] ?? 0) + e.amount
+    acc[e.category] = (acc[e.category] ?? 0) + (e.inr_amount ?? e.amount)
     return acc
   }, {} as Record<string, number>) ?? {}
 
-  // Cash flow bar (% of income, or expenses+savings if no income)
   const barBase = totalIncome > 0 ? totalIncome : (totalExpenses + totalSavings || 1)
   const expPct  = Math.min((totalExpenses / barBase) * 100, 100)
   const savPct  = Math.min((totalSavings  / barBase) * 100, Math.max(0, 100 - expPct))
   const freePct = Math.max(0, 100 - expPct - savPct)
+
+  const selectedCurrencyMeta = getCurrency(currency)
 
   return (
     <div className="max-w-4xl mx-auto">
@@ -186,7 +211,7 @@ export function PersonalDashboard({ userId }: Props) {
         })}
       </div>
 
-      {/* Summary card — Income / Spent / Saved + cash flow bar */}
+      {/* Summary card */}
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="glass rounded-2xl p-5 mb-5">
         <div className="grid grid-cols-3 gap-2 mb-4">
           <div>
@@ -242,7 +267,7 @@ export function PersonalDashboard({ userId }: Props) {
         </div>
       </motion.div>
 
-      {/* 4 tabs — no Budgets tab, merged into Analytics */}
+      {/* 4 tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="bg-white/5 border border-white/8 mb-5 w-full grid grid-cols-4">
           {[
@@ -270,6 +295,7 @@ export function PersonalDashboard({ userId }: Props) {
             <div className="space-y-2">
               {expenses?.map((expense, i) => {
                 const meta = EXPENSE_CATEGORY_META[expense.category as ExpenseCategory]
+                const isForeign = expense.currency && expense.currency !== 'INR'
                 return (
                   <motion.div
                     key={expense.id}
@@ -293,7 +319,16 @@ export function PersonalDashboard({ userId }: Props) {
                         {expense.paid_from === 'income' ? '💼' : '🐷'}
                       </span>
                     )}
-                    <span className="font-semibold text-sm">{formatINR(expense.amount)}</span>
+                    <div className="text-right shrink-0">
+                      {isForeign && expense.inr_amount ? (
+                        <>
+                          <span className="font-semibold text-sm">{formatCurrency(expense.amount, expense.currency)}</span>
+                          <p className="text-xs text-muted-foreground">{formatINR(expense.inr_amount)}</p>
+                        </>
+                      ) : (
+                        <span className="font-semibold text-sm">{formatINR(expense.inr_amount ?? expense.amount)}</span>
+                      )}
+                    </div>
                     <button onClick={() => deleteExpense.mutate(expense.id)} className="opacity-0 group-hover:opacity-100 p-1 text-muted-foreground hover:text-rose-400 transition-all">
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
@@ -334,15 +369,54 @@ export function PersonalDashboard({ userId }: Props) {
                 <Input placeholder="Coffee, Groceries..." className="bg-white/5 border-white/10" {...register('title')} />
                 {errors.title && <p className="text-destructive text-xs">{errors.title.message}</p>}
               </div>
-              <div className="space-y-1.5">
-                <Label>Amount (₹)</Label>
-                <div className="relative">
-                  <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground">₹</span>
-                  <Input type="number" step="0.01" className="pl-6 bg-white/5 border-white/10" {...register('amount')} />
+              <div className="col-span-2 space-y-1.5">
+                <Label>Amount</Label>
+                <div className="flex gap-2">
+                  {/* Currency selector */}
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setCurrencyOpen(!currencyOpen)}
+                      className="flex items-center gap-1 h-9 px-3 rounded-xl border border-white/10 bg-white/5 hover:bg-white/8 transition-colors text-sm font-medium min-w-[70px]"
+                    >
+                      <span>{selectedCurrencyMeta.symbol}</span>
+                      <span className="text-xs text-muted-foreground">{currency}</span>
+                      <ChevronDown className="w-3 h-3 text-muted-foreground" />
+                    </button>
+                    {currencyOpen && (
+                      <div className="absolute top-10 left-0 z-50 glass-strong border border-white/10 rounded-xl overflow-hidden w-52 shadow-xl max-h-60 overflow-y-auto">
+                        {SUPPORTED_CURRENCIES.map((c) => (
+                          <button
+                            key={c.code}
+                            type="button"
+                            onClick={() => { setCurrency(c.code); setCurrencyOpen(false) }}
+                            className={cn(
+                              'w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left transition-colors',
+                              currency === c.code ? 'bg-primary/15 text-primary' : 'hover:bg-white/5 text-foreground'
+                            )}
+                          >
+                            <span className="w-6 text-center font-medium">{c.symbol}</span>
+                            <span className="font-medium">{c.code}</span>
+                            <span className="text-muted-foreground text-xs truncate">{c.name}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <Input type="number" step="0.01" className="flex-1 bg-white/5 border-white/10" {...register('amount')} />
                 </div>
                 {errors.amount && <p className="text-destructive text-xs">{errors.amount.message}</p>}
+                {currency !== 'INR' && amount > 0 && (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    {fetchingRate ? (
+                      <><Loader2 className="w-3 h-3 animate-spin" /> Fetching rate...</>
+                    ) : (
+                      <><span className="text-primary font-medium">{formatINR(inrAmount)}</span><span>· 1 {currency} = {formatINR(exchangeRate)}</span></>
+                    )}
+                  </div>
+                )}
               </div>
-              <div className="space-y-1.5">
+              <div className="col-span-2 space-y-1.5">
                 <Label>Date</Label>
                 <Input type="date" className="bg-white/5 border-white/10" {...register('date')} />
               </div>
@@ -393,7 +467,7 @@ export function PersonalDashboard({ userId }: Props) {
 
             <div className="flex gap-3">
               <Button type="button" variant="ghost" className="flex-1" onClick={() => setAddOpen(false)}>Cancel</Button>
-              <Button type="submit" className="flex-1 gradient-teal text-[#0a0f1e] font-semibold" disabled={isSubmitting}>
+              <Button type="submit" className="flex-1 gradient-teal text-[#0a0f1e] font-semibold" disabled={isSubmitting || fetchingRate}>
                 {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Add Expense'}
               </Button>
             </div>

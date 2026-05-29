@@ -1,4 +1,5 @@
 import { format, formatDistanceToNow, isToday, isYesterday } from 'date-fns'
+import { formatCurrency as _formatCurrency } from '@/lib/utils/currency'
 
 /**
  * Format currency in Indian Rupee format
@@ -18,6 +19,14 @@ export function formatINR(amount: number, compact = false): string {
     minimumFractionDigits: 0,
     maximumFractionDigits: 2,
   }).format(amount)
+}
+
+/**
+ * Format an amount in any currency using Intl.NumberFormat.
+ * Delegates to lib/utils/currency for the actual formatting logic.
+ */
+export function formatCurrency(amount: number, currency: string): string {
+  return _formatCurrency(amount, currency)
 }
 
 /**

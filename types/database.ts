@@ -100,6 +100,8 @@ export interface Database {
           title: string
           amount: number
           currency: string
+          inr_amount: number | null
+          exchange_rate: number | null
           paid_by: string
           category: ExpenseCategory
           date: string
@@ -115,6 +117,8 @@ export interface Database {
           title: string
           amount: number
           currency?: string
+          inr_amount?: number | null
+          exchange_rate?: number | null
           paid_by: string
           category: ExpenseCategory
           date: string
@@ -130,6 +134,8 @@ export interface Database {
           title?: string
           amount?: number
           currency?: string
+          inr_amount?: number | null
+          exchange_rate?: number | null
           paid_by?: string
           category?: ExpenseCategory
           date?: string
@@ -219,6 +225,9 @@ export interface Database {
           user_id: string
           title: string
           amount: number
+          currency: string
+          inr_amount: number | null
+          exchange_rate: number | null
           category: ExpenseCategory
           date: string
           notes: string | null
@@ -230,6 +239,9 @@ export interface Database {
           user_id: string
           title: string
           amount: number
+          currency?: string
+          inr_amount?: number | null
+          exchange_rate?: number | null
           category: ExpenseCategory
           date: string
           notes?: string | null
@@ -241,6 +253,9 @@ export interface Database {
           user_id?: string
           title?: string
           amount?: number
+          currency?: string
+          inr_amount?: number | null
+          exchange_rate?: number | null
           category?: ExpenseCategory
           date?: string
           notes?: string | null
@@ -283,6 +298,9 @@ export interface Database {
           source: IncomeSource
           title: string
           amount: number
+          currency: string
+          inr_amount: number | null
+          exchange_rate: number | null
           month: number
           year: number
           notes: string | null
@@ -294,6 +312,9 @@ export interface Database {
           source: IncomeSource
           title: string
           amount: number
+          currency?: string
+          inr_amount?: number | null
+          exchange_rate?: number | null
           month: number
           year: number
           notes?: string | null
@@ -305,6 +326,9 @@ export interface Database {
           source?: IncomeSource
           title?: string
           amount?: number
+          currency?: string
+          inr_amount?: number | null
+          exchange_rate?: number | null
           month?: number
           year?: number
           notes?: string | null
@@ -318,6 +342,9 @@ export interface Database {
           user_id: string
           title: string
           amount: number
+          currency: string
+          inr_amount: number | null
+          exchange_rate: number | null
           date: string
           notes: string | null
           created_at: string
@@ -327,6 +354,9 @@ export interface Database {
           user_id: string
           title: string
           amount: number
+          currency?: string
+          inr_amount?: number | null
+          exchange_rate?: number | null
           date: string
           notes?: string | null
           created_at?: string
@@ -336,6 +366,9 @@ export interface Database {
           user_id?: string
           title?: string
           amount?: number
+          currency?: string
+          inr_amount?: number | null
+          exchange_rate?: number | null
           date?: string
           notes?: string | null
           created_at?: string
