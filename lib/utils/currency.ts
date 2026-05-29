@@ -34,7 +34,7 @@ export async function fetchExchangeRate(from: string, to: string = 'INR'): Promi
   if (from === to) return 1
   try {
     const res = await fetch(
-      `https://api.frankfurter.app/latest?from=${from}&to=${to}`,
+      `https://api.frankfurter.dev/v1/latest?from=${from}&to=${to}`,
       { cache: 'no-store' }
     )
     if (!res.ok) return null
