@@ -123,13 +123,13 @@ export function GroupDetail({ group: initialGroup, userId, userRole }: Props) {
           <GroupBalances groupId={group.id} userId={userId} baseCurrency={group.base_currency ?? 'INR'} />
         </TabsContent>
         <TabsContent value="analytics">
-          <GroupAnalytics groupId={group.id} userId={userId} />
+          <GroupAnalytics groupId={group.id} userId={userId} baseCurrency={group.base_currency ?? 'INR'} />
         </TabsContent>
         <TabsContent value="members">
           <GroupMembers groupId={group.id} userId={userId} userRole={userRole} />
         </TabsContent>
         <TabsContent value="activity">
-          <GroupActivity groupId={group.id} />
+          <GroupActivity groupId={group.id} baseCurrency={group.base_currency ?? 'INR'} />
         </TabsContent>
       </Tabs>
 

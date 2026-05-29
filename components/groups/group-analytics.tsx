@@ -9,13 +9,15 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Progress } from '@/components/ui/progress'
 import { createClient } from '@/lib/supabase/client'
-import { formatINR, getInitials } from '@/lib/utils/formatters'
+import { getInitials } from '@/lib/utils/formatters'
+import { formatCurrency } from '@/lib/utils/currency'
 import { EXPENSE_CATEGORY_META } from '@/components/expenses/expense-category-meta'
 import type { UserProfile, ExpenseCategory } from '@/types/database'
 
 interface Props {
   groupId: string
   userId: string
+  baseCurrency?: string
 }
 
 const PIE_COLORS = ['#00d4aa', '#6366f1', '#f43f5e', '#f59e0b', '#10b981', '#3b82f6', '#a855f7']
@@ -28,8 +30,9 @@ const TOOLTIP_STYLE = {
   fontSize: '12px',
 }
 
-export function GroupAnalytics({ groupId, userId }: Props) {
+export function GroupAnalytics({ groupId, userId, baseCurrency = 'INR' }: Props) {
   const supabase = createClient()
+  const fmt = (n: number) => formatCurrency(n, baseCurrency)
 
   const { data, isLoading } = useQuery({
     queryKey: ['group-analytics', groupId],
@@ -163,10 +166,10 @@ export function GroupAnalytics({ groupId, userId }: Props) {
       {/* ── Quick stats ── */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: 'Total spent', value: formatINR(totalSpend) },
+          { label: 'Total spent', value: fmt(totalSpend) },
           { label: 'Expenses', value: String(expenseCount) },
-          { label: 'Avg expense', value: formatINR(Math.round(avgExpense)) },
-          { label: 'Largest', value: largest ? formatINR(largest.amount) : '—' },
+          { label: 'Avg expense', value: fmt(Math.round(avgExpense)) },
+          { label: 'Largest', value: largest ? fmt(largest.amount) : '—' },
         ].map((s, i) => (
           <motion.div
             key={s.label}
@@ -189,8 +192,8 @@ export function GroupAnalytics({ groupId, userId }: Props) {
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
             <XAxis dataKey="month" tick={{ fill: '#94a3b8', fontSize: 11 }} axisLine={false} tickLine={false} />
             <YAxis tick={{ fill: '#94a3b8', fontSize: 11 }} axisLine={false} tickLine={false}
-              tickFormatter={(v) => `₹${v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v}`} />
-            <ReTooltip contentStyle={TOOLTIP_STYLE} formatter={(v) => [formatINR(v as number), 'Spent']} />
+              tickFormatter={(v) => fmt(v as number)} />
+            <ReTooltip contentStyle={TOOLTIP_STYLE} formatter={(v) => [fmt(v as number), 'Spent']} />
             <Bar dataKey="total" fill="#00d4aa" radius={[4, 4, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
@@ -206,7 +209,7 @@ export function GroupAnalytics({ groupId, userId }: Props) {
                 <Pie data={categoryData} cx="50%" cy="50%" innerRadius={55} outerRadius={75} paddingAngle={3} dataKey="value">
                   {categoryData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
                 </Pie>
-                <ReTooltip contentStyle={TOOLTIP_STYLE} formatter={(v) => [formatINR(v as number), '']} />
+                <ReTooltip contentStyle={TOOLTIP_STYLE} formatter={(v) => [fmt(v as number), '']} />
               </PieChart>
             </ResponsiveContainer>
           </div>
@@ -217,7 +220,7 @@ export function GroupAnalytics({ groupId, userId }: Props) {
                   <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: PIE_COLORS[i % PIE_COLORS.length] }} />
                   <span className="text-sm flex-1">{item.emoji} {item.name}</span>
                   <span className="text-xs text-muted-foreground">{item.pct}%</span>
-                  <span className="text-sm font-medium w-24 text-right">{formatINR(item.value)}</span>
+                  <span className="text-sm font-medium w-24 text-right">{fmt(item.value)}</span>
                 </div>
                 <Progress value={item.pct} className="h-1.5 bg-white/10" />
               </div>
@@ -246,12 +249,12 @@ export function GroupAnalytics({ groupId, userId }: Props) {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-medium">{isMe ? 'You' : user.full_name ?? 'Unknown'}</span>
-                      <span className="text-sm font-bold">{formatINR(paid)}</span>
+                      <span className="text-sm font-bold">{fmt(paid)}</span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-xs text-muted-foreground">{pct}% of total · share {formatINR(share)}</span>
+                      <span className="text-xs text-muted-foreground">{pct}% of total · share {fmt(share)}</span>
                       <span className={`text-xs font-medium ${net > 0 ? 'text-emerald-400' : net < 0 ? 'text-rose-400' : 'text-muted-foreground'}`}>
-                        {net > 0 ? `+${formatINR(net)} net` : net < 0 ? `${formatINR(net)} net` : 'even'}
+                        {net > 0 ? `+${fmt(net)} net` : net < 0 ? `${fmt(net)} net` : 'even'}
                       </span>
                     </div>
                   </div>
@@ -282,8 +285,8 @@ export function GroupAnalytics({ groupId, userId }: Props) {
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
               <XAxis dataKey="name" tick={{ fill: '#94a3b8', fontSize: 11 }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fill: '#94a3b8', fontSize: 11 }} axisLine={false} tickLine={false}
-                tickFormatter={(v) => `₹${v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v}`} />
-              <ReTooltip contentStyle={TOOLTIP_STYLE} formatter={(v, name) => [formatINR(v as number), EXPENSE_CATEGORY_META[name as ExpenseCategory]?.label ?? String(name)]} />
+                tickFormatter={(v) => fmt(v as number)} />
+              <ReTooltip contentStyle={TOOLTIP_STYLE} formatter={(v, name) => [fmt(v as number), EXPENSE_CATEGORY_META[name as ExpenseCategory]?.label ?? String(name)]} />
               <Legend formatter={(value) => EXPENSE_CATEGORY_META[value as ExpenseCategory]?.label ?? value} wrapperStyle={{ fontSize: '11px', color: '#94a3b8' }} />
               {Object.entries(EXPENSE_CATEGORY_META).map(([cat, meta], i) => (
                 <Bar key={cat} dataKey={cat} stackId="a" fill={PIE_COLORS[i % PIE_COLORS.length]} radius={i === Object.keys(EXPENSE_CATEGORY_META).length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]} />

@@ -5,13 +5,15 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
 import { Receipt, HandCoins, UserPlus } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import { formatRelative, formatINR } from '@/lib/utils/formatters'
+import { formatRelative } from '@/lib/utils/formatters'
+import { formatCurrency } from '@/lib/utils/currency'
 
 interface Props {
   groupId: string
+  baseCurrency?: string
 }
 
-export function GroupActivity({ groupId }: Props) {
+export function GroupActivity({ groupId, baseCurrency = 'INR' }: Props) {
   const supabase = createClient()
   const queryClient = useQueryClient()
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
@@ -74,7 +76,7 @@ export function GroupActivity({ groupId }: Props) {
           color: 'text-indigo-400',
           bg: 'bg-indigo-400/15',
           label: `${e.users?.full_name ?? 'Someone'} added "${e.title}"`,
-          sub: formatINR(e.amount),
+          sub: formatCurrency(e.amount, baseCurrency),
           at: e.created_at,
         })),
         ...(settlements ?? []).map((s) => ({
@@ -84,7 +86,7 @@ export function GroupActivity({ groupId }: Props) {
           color: 'text-emerald-400',
           bg: 'bg-emerald-400/15',
           label: `${s.payer?.full_name ?? 'Someone'} paid ${s.recipient?.full_name ?? 'someone'}${s.payment_app ? ` via ${s.payment_app}` : ''}`,
-          sub: `${formatINR(s.amount)} · ${s.status.replace('_', ' ')}`,
+          sub: `${formatCurrency(s.amount, baseCurrency)} · ${s.status.replace('_', ' ')}`,
           at: s.created_at,
         })),
         ...(joins ?? []).map((j) => ({

@@ -4,7 +4,7 @@ import { motion } from 'framer-motion'
 import { useQuery } from '@tanstack/react-query'
 import { TrendingDown, TrendingUp, Users, Receipt } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import { formatINR } from '@/lib/utils/formatters'
+import { formatCurrency, getCurrency } from '@/lib/utils/currency'
 import { CountUp } from '@/components/animations/count-up'
 
 interface Props {
@@ -28,13 +28,13 @@ export function DashboardStats({ userId }: Props) {
       // Get expenses where user is involved
       const { data: splitsRaw } = await supabase
         .from('expense_splits')
-        .select('amount, expense_id, expenses(paid_by, amount)')
+        .select('amount, expense_id, expenses(paid_by, inr_amount, amount)')
         .eq('user_id', userId)
 
       const splits = splitsRaw as Array<{
         amount: number
         expense_id: string
-        expenses: { paid_by: string; amount: number } | null
+        expenses: { paid_by: string; inr_amount: number | null; amount: number } | null
       }> | null
 
       let totalOwed = 0 // others owe you
@@ -43,9 +43,10 @@ export function DashboardStats({ userId }: Props) {
       for (const split of splits ?? []) {
         const expense = split.expenses
         if (!expense) continue
+        const expenseTotal = expense.inr_amount ?? expense.amount
         if (expense.paid_by === userId) {
           // You paid — others owe you (your split back to yourself)
-          totalOwed += expense.amount - split.amount
+          totalOwed += expenseTotal - split.amount
         } else {
           // Someone else paid — you owe them
           totalOwe += split.amount
@@ -159,7 +160,7 @@ export function DashboardStats({ userId }: Props) {
                 <CountUp to={card.value} />
               ) : (
                 <span>
-                  ₹<CountUp to={card.value} decimals={0} />
+                  {getCurrency('INR').symbol}<CountUp to={card.value} decimals={0} />
                 </span>
               )}
             </div>

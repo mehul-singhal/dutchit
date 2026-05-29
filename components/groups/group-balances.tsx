@@ -14,7 +14,7 @@ import {
 } from 'recharts'
 import { createClient } from '@/lib/supabase/client'
 import { calculateBalances, simplifyDebts } from '@/lib/utils/debt-simplifier'
-import { formatINR, getInitials } from '@/lib/utils/formatters'
+import { getInitials } from '@/lib/utils/formatters'
 import { formatCurrency } from '@/lib/utils/currency'
 import { EXPENSE_CATEGORY_META } from '@/components/expenses/expense-category-meta'
 import { UpiPaymentSheet } from '@/components/settlements/upi-payment-sheet'

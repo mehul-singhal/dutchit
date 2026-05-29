@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
 import { createClient } from '@/lib/supabase/client'
 import { formatRelative } from '@/lib/utils/formatters'
+import { formatCurrency } from '@/lib/utils/currency'
 import { Receipt, HandCoins } from 'lucide-react'
 
 interface Props {
@@ -28,7 +29,7 @@ export function RecentActivity({ userId }: Props) {
       // Recent expenses
       const { data: expensesRaw } = await supabase
         .from('expenses')
-        .select('id, title, amount, created_at, paid_by, users!expenses_paid_by_fkey(full_name)')
+        .select('id, title, amount, inr_amount, currency, created_at, paid_by, users!expenses_paid_by_fkey(full_name)')
         .in('group_id', groupIds)
         .order('created_at', { ascending: false })
         .limit(5)
@@ -37,6 +38,8 @@ export function RecentActivity({ userId }: Props) {
         id: string
         title: string
         amount: number
+        inr_amount: number | null
+        currency: string
         created_at: string
         paid_by: string
         users: { full_name: string } | null
@@ -66,7 +69,8 @@ export function RecentActivity({ userId }: Props) {
           id: e.id,
           type: 'expense' as const,
           label: `${e.users?.full_name ?? 'Someone'} added "${e.title}"`,
-          amount: e.amount,
+          amount: e.inr_amount ?? e.amount,
+          currency: 'INR',
           at: e.created_at,
         })),
         ...(settlements ?? []).map((s) => ({
@@ -74,6 +78,7 @@ export function RecentActivity({ userId }: Props) {
           type: 'settlement' as const,
           label: `${s.payer?.full_name ?? 'Someone'} paid ${s.recipient?.full_name ?? 'someone'}`,
           amount: s.amount,
+          currency: 'INR',
           at: s.created_at,
         })),
       ].sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime()).slice(0, 8)
@@ -121,7 +126,7 @@ export function RecentActivity({ userId }: Props) {
                 <p className="text-[10px] text-muted-foreground mt-0.5">{formatRelative(item.at)}</p>
               </div>
               <span className="text-xs font-semibold text-foreground shrink-0">
-                ₹{item.amount.toLocaleString('en-IN')}
+                {formatCurrency(item.amount, item.currency)}
               </span>
             </motion.div>
           ))}

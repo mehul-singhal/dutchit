@@ -6,7 +6,6 @@ import { useQuery } from '@tanstack/react-query'
 import { Users, ChevronRight } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { GROUP_CATEGORY_META } from '@/components/groups/group-category-meta'
-import { formatINR } from '@/lib/utils/formatters'
 import { formatCurrency } from '@/lib/utils/currency'
 import type { Group } from '@/types/database'
 
