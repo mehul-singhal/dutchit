@@ -84,7 +84,7 @@ export function AddExpenseSheet({ open, onOpenChange, groupId, userId, groupBase
   const [splitData, setSplitData] = useState<Record<string, number | boolean>>({})
   const [uploading, setUploading] = useState(false)
   const [receiptUrl, setReceiptUrl] = useState('')
-  const [currency, setCurrency] = useState('INR')
+  const [currency, setCurrency] = useState(groupBaseCurrency)
   const [exchangeRate, setExchangeRate] = useState(1)
   const [fetchingRate, setFetchingRate] = useState(false)
   const [currencyOpen, setCurrencyOpen] = useState(false)
@@ -191,7 +191,7 @@ export function AddExpenseSheet({ open, onOpenChange, groupId, userId, groupBase
             paid_by: userId,
           })
           setSplitType('equal')
-          setCurrency('INR')
+          setCurrency(groupBaseCurrency)
           // Don't manually set exchangeRate here — the rate-fetch effect handles it
           const init: Record<string, boolean> = {}
           users.forEach((u) => (init[u.id] = true))
@@ -371,7 +371,7 @@ export function AddExpenseSheet({ open, onOpenChange, groupId, userId, groupBase
       reset()
       setReceiptUrl('')
       setSplitType('equal')
-      setCurrency('INR')
+      setCurrency(groupBaseCurrency)
       // Don't manually set exchangeRate — rate-fetch effect handles it
     }
 
